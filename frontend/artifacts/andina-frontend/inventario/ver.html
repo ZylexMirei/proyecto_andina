@@ -56,16 +56,39 @@
     </div></div>
   </div>
 
+  <!-- Pestañas (Tabs) de Inventario y Movimientos -->
   <div class="card">
+    <div class="card-header p-0">
+      <ul class="nav nav-tabs" role="tablist" style="padding:0 16px;border-bottom:none;">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabStock"><i class="bi bi-box-seam me-2"></i>Stock Actual</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabMovimientos"><i class="bi bi-clock-history me-2"></i>Historial de Movimientos</button></li>
+      </ul>
+    </div>
     <div class="card-body p-0">
-      <div class="table-responsive">
-        <table id="tablaInventario" class="table table-striped mb-0 w-100">
-          <thead><tr>
-            <th>Código</th><th>Producto</th><th>Almacén</th><th>Stock actual</th>
-            <th>Stock mín.</th><th>Stock máx.</th><th>Estado</th><th>Nivel</th>
-          </tr></thead>
-          <tbody id="tbodyInventario"></tbody>
-        </table>
+      <div class="tab-content">
+        <!-- Tab Stock Actual -->
+        <div class="tab-pane fade show active" id="tabStock">
+          <div class="table-responsive">
+            <table id="tablaInventario" class="table table-striped mb-0 w-100">
+              <thead><tr>
+                <th>Código</th><th>Producto</th><th>Almacén</th><th>Stock actual</th>
+                <th>Stock mín.</th><th>Stock máx.</th><th>Estado</th><th>Nivel</th>
+              </tr></thead>
+              <tbody id="tbodyInventario"></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Tab Historial de Movimientos -->
+        <div class="tab-pane fade" id="tabMovimientos">
+          <div class="table-responsive">
+            <table id="tablaMovimientos" class="table table-striped mb-0 w-100">
+              <thead><tr>
+                <th>Fecha</th><th>Producto</th><th>Tipo</th><th>Cant.</th><th>Almacén</th><th>Usuario</th><th>Observación</th>
+              </tr></thead>
+              <tbody id="tbodyMovimientos"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -128,10 +151,8 @@
 const session = Andina.initPage({ activeKey:'inventario', pageTitle:'Inventario' });
 if(!session) throw new Error('no session');
 
-const almacenes = ['Almacén Central','Almacén Norte','Almacén Sur'];
-const inventario = Andina.MOCK_DATA.productos.map((p,i)=>({
-  ...p, almacen: almacenes[i % almacenes.length],
-}));
+let inventarioData = [];
+let movimientosData = [];
 
 function updateCounters(data) {
   document.getElementById('countNormal').textContent = data.filter(p=>p.estado==='Normal').length;
@@ -147,7 +168,7 @@ function renderInventario(data) {
     const fillClass = p.estado==='Normal'?'normal':p.estado==='Alerta'?'alerta':'critico';
     return `<tr>
       <td><code style="font-size:12px;color:var(--primary);">${p.codigo}</code></td>
-      <td><strong style="font-size:13px;">${p.nombre}</strong><div style="font-size:11.5px;color:#718096;">${p.categoria}</div></td>
+      <td><strong style="font-size:13px; color:var(--text);">${p.nombre}</strong></td>
       <td><i class="bi bi-geo-alt me-1 text-muted"></i>${p.almacen}</td>
       <td><span style="font-size:15px;font-weight:700;color:${p.stock===0?'#dc3545':p.stock<p.stock_min?'#d97706':'#28a745'}">${p.stock}</span></td>
       <td>${p.stock_min}</td>
@@ -156,55 +177,126 @@ function renderInventario(data) {
       <td style="min-width:120px;"><div class="stock-bar"><div class="stock-fill ${fillClass}" style="width:${pct}%"></div></div><div style="font-size:11px;color:#718096;margin-top:2px;">${pct.toFixed(0)}% del máximo</div></td>
     </tr>`;
   }).join('');
+
+  if($.fn.DataTable.isDataTable('#tablaInventario')) $('#tablaInventario').DataTable().destroy();
+  $('#tablaInventario').DataTable({ language:{url:'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json'}, order:[[0,'asc']], pageLength:10 });
+}
+
+function renderMovimientos(data) {
+  const tbody = document.getElementById('tbodyMovimientos');
+  tbody.innerHTML = data.map(m => {
+    const isSalida = m.tipo.toLowerCase() === 'salida';
+    const tipoBadge = m.tipo.toLowerCase() === 'entrada' ? '<span class="badge badge-completado"><i class="bi bi-arrow-down-left-circle me-1"></i>Entrada</span>' :
+                      isSalida ? '<span class="badge badge-critico"><i class="bi bi-arrow-up-right-circle me-1"></i>Salida</span>' :
+                      '<span class="badge badge-alerta"><i class="bi bi-arrow-left-right me-1"></i>Traslado</span>';
+    
+    let almacen = m.almacen_origen_nombre || '-';
+    if(m.tipo.toLowerCase() === 'traslado' && m.almacen_destino_nombre) almacen += ` <i class="bi bi-arrow-right mx-1"></i> ${m.almacen_destino_nombre}`;
+
+    return `<tr>
+      <td style="font-size:12px;color:#718096;">${Andina.formatDateTime(m.fecha_hora)}</td>
+      <td><code style="font-size:12px;color:var(--primary);">${m.producto_codigo}</code> <strong style="font-size:13px;color:var(--text);">${m.producto_nombre}</strong></td>
+      <td>${tipoBadge}</td>
+      <td><strong style="font-size:14px;color:${isSalida?'#dc3545':'#28a745'};">${isSalida?'-':'+'}${m.cantidad}</strong></td>
+      <td style="font-size:13px;"><i class="bi bi-geo-alt text-muted me-1"></i>${almacen}</td>
+      <td><code style="font-size:12px;">@${m.responsable_username || 'sistema'}</code></td>
+      <td style="font-size:12.5px;color:#718096;max-width:200px;" class="text-truncate" title="${m.observacion || ''}">${m.observacion || '-'}</td>
+    </tr>`;
+  }).join('');
+  if($.fn.DataTable.isDataTable('#tablaMovimientos')) $('#tablaMovimientos').DataTable().destroy();
+  $('#tablaMovimientos').DataTable({ language:{url:'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json'}, order:[[0,'desc']], pageLength:10 });
 }
 
 // Ocultar botón movimiento para empleados
 if(session.rol==='Empleado') document.getElementById('btnMovimiento').style.display='none';
 
-updateCounters(inventario);
-renderInventario(inventario);
+async function cargarDatosReales() {
+  document.getElementById('tbodyInventario').innerHTML = '<tr><td colspan="8" class="text-center py-4"><span class="spinner-border spinner-border-sm text-primary me-2"></span>Cargando inventario...</td></tr>';
+  document.getElementById('tbodyMovimientos').innerHTML = '<tr><td colspan="7" class="text-center py-4"><span class="spinner-border spinner-border-sm text-primary me-2"></span>Cargando historial...</td></tr>';
+  
+  const resInv = await Andina.apiRequest('inventario', {}, 'GET');
+  if (resInv.exito) {
+    inventarioData = resInv.inventario.map(i => ({
+      id: i.id_inventario, codigo: i.codigo, nombre: i.producto, almacen: i.almacen,
+      stock: parseInt(i.cantidad_actual), stock_min: parseInt(i.stock_minimo), stock_max: parseInt(i.stock_maximo),
+      estado: i.estado === 'CRITICO' ? 'Crítico' : i.estado === 'AGOTADO' ? 'Agotado' : i.estado === 'ALERTA' ? 'Alerta' : 'Normal'
+    }));
+    updateCounters(inventarioData);
+    renderInventario(inventarioData);
+    
+    // Rellenar Filtro de Almacenes superior dinámicamente
+    const almacenes = [...new Set(inventarioData.map(i => i.almacen))].sort();
+    document.getElementById('filtroAlmacen').innerHTML = '<option value="">Todos los almacenes</option>' + almacenes.map(a => `<option value="${a}">${a}</option>`).join('');
+  } else {
+    document.getElementById('tbodyInventario').innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">Error: ${resInv.error}</td></tr>`;
+  }
 
-$('#tablaInventario').DataTable({
-  language: { url:'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json' },
-  order:[[0,'asc']], pageLength:10, destroy:true,
-});
+  // Poblar Modal: Productos
+  const selProd = document.getElementById('prodMovimiento');
+  selProd.innerHTML = '<option value="">Seleccionar producto...</option>';
+  const resProd = await Andina.apiRequest('listar_productos', {}, 'GET');
+  if (resProd.exito) {
+    resProd.productos.forEach(p => selProd.innerHTML += `<option value="${p.id_producto}">${p.codigo} — ${p.nombre}</option>`);
+  }
 
-// Llenar select productos en modal
-const sel = document.getElementById('prodMovimiento');
-Andina.MOCK_DATA.productos.forEach(p => {
-  const opt = document.createElement('option');
-  opt.value = p.id; opt.textContent = `${p.codigo} — ${p.nombre}`;
-  sel.appendChild(opt);
-});
+  // Poblar Modal: Almacenes
+  const selAlm = document.getElementById('almacenMovimiento');
+  selAlm.innerHTML = '';
+  const resAlm = await Andina.apiRequest('listar_almacenes', {}, 'GET');
+  if (resAlm.exito) {
+    resAlm.almacenes.forEach(a => selAlm.innerHTML += `<option value="${a.id_almacen}">${a.nombre}</option>`);
+  }
+
+  // Poblar Historial de Movimientos
+  const resMov = await Andina.apiRequest('listar_movimientos', {}, 'GET');
+  if (resMov.exito) {
+    movimientosData = resMov.movimientos;
+    renderMovimientos(movimientosData);
+  }
+}
+
+// Iniciar carga automática
+cargarDatosReales();
 
 // Filtros
-document.getElementById('filtroEstado').addEventListener('change', function() {
-  const val = this.value;
-  const filtrado = val ? inventario.filter(p=>p.estado===val) : inventario;
+function aplicarFiltros() {
+  const est = document.getElementById('filtroEstado').value;
+  const alm = document.getElementById('filtroAlmacen').value;
+  let filtrado = inventarioData;
+  if (est) filtrado = filtrado.filter(p => p.estado === est);
+  if (alm) filtrado = filtrado.filter(p => p.almacen === alm);
   updateCounters(filtrado);
   renderInventario(filtrado);
-  if($.fn.DataTable.isDataTable('#tablaInventario')) $('#tablaInventario').DataTable().destroy();
-  $('#tablaInventario').DataTable({ language:{url:'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json'}, order:[[0,'asc']], pageLength:10 });
-});
+}
+document.getElementById('filtroEstado').addEventListener('change', aplicarFiltros);
+document.getElementById('filtroAlmacen').addEventListener('change', aplicarFiltros);
 
 function abrirModalMovimiento() {
+  document.getElementById('cantMovimiento').value = '';
+  document.getElementById('obsMovimiento').value = '';
   new bootstrap.Modal(document.getElementById('modalMovimiento')).show();
 }
 
 async function guardarMovimiento() {
   const prod=document.getElementById('prodMovimiento').value;
   const cant=document.getElementById('cantMovimiento').value;
+  const tipo=document.getElementById('tipoMovimiento').value;
+  const almacen=document.getElementById('almacenMovimiento').value;
   if(!prod||!cant||cant<=0){ Andina.showToast('Completa los campos requeridos','warning'); return; }
   
   const res = await Andina.apiRequest('registrar_movimiento',{
-    producto_id:prod, cantidad:parseInt(cant),
-    tipo:document.getElementById('tipoMovimiento').value,
-    almacen:document.getElementById('almacenMovimiento').value,
+    producto_id: prod, cantidad: parseInt(cant),
+    tipo: tipo, almacen: almacen,
     observaciones:document.getElementById('obsMovimiento').value,
   });
   
-  bootstrap.Modal.getInstance(document.getElementById('modalMovimiento')).hide();
-  Andina.showToast('Movimiento registrado correctamente','success');
+  if (res.exito) {
+    bootstrap.Modal.getInstance(document.getElementById('modalMovimiento')).hide();
+    Andina.showToast(res.mensaje, 'success');
+    cargarDatosReales(); // Recargar tabla al instante
+  } else {
+    Andina.showToast(res.error, 'error');
+  }
 }
 </script>
 <script src="../assets/js/transitions.js"></script>

@@ -18,34 +18,46 @@ const Recomendaciones = {
   },
 
   // Obtener recomendaciones para un producto
-  parProducto(prodId, limit = 3) {
+  parProducto(prodId, productosData = null, limit = 3) {
     const ids = this.correlacion[prodId] || [];
-    const todos = Andina.MOCK_DATA.productos;
-    return ids
-      .map(id => todos.find(p => p.id === id))
+    const todos = productosData || window.productosGlobales || Andina.MOCK_DATA.productos;
+    
+    let recomendados = ids
+      .map(id => todos.find(p => p.id == id || p.id_producto == id))
       .filter(Boolean)
-      .filter(p => p.estado !== 'Agotado')
-      .slice(0, limit);
+      .filter(p => p.estado !== 'Agotado');
+
+    // MAGIA: Si el producto es nuevo de la BD y no tiene regla en el código de arriba
+    if (recomendados.length === 0 && todos.length > 0) {
+      const otros = todos.filter(p => (p.id || p.id_producto) != prodId && p.estado !== 'Agotado');
+      // Mezclamos matemáticamente para que siempre recomiende los mismos para ese producto
+      otros.sort((a, b) => (((a.id || a.id_producto) * prodId) % 7) - (((b.id || b.id_producto) * prodId) % 7));
+      recomendados = otros;
+    }
+
+    return recomendados.slice(0, limit);
   },
 
   // Recomendaciones para el carrito actual
-  parCarrito(carrito, limit = 4) {
-    const idsEnCarrito = carrito.map(c => c.id);
+  parCarrito(carrito, productosData = null, limit = 4) {
+    const idsEnCarrito = carrito.map(c => c.id || c.id_producto);
     const candidatos = new Map();
 
     idsEnCarrito.forEach(id => {
-      const recs = this.parProducto(id);
+      const recs = this.parProducto(id, productosData);
       recs.forEach(p => {
-        if (!idsEnCarrito.includes(p.id)) {
-          candidatos.set(p.id, (candidatos.get(p.id) || 0) + 1);
+        const recId = p.id || p.id_producto;
+        if (!idsEnCarrito.includes(recId)) {
+          candidatos.set(recId, (candidatos.get(recId) || 0) + 1);
         }
       });
     });
 
+    const todos = productosData || window.productosGlobales || Andina.MOCK_DATA.productos;
     // Ordenar por frecuencia de aparición
     const sorted = [...candidatos.entries()]
       .sort((a, b) => b[1] - a[1])
-      .map(([id]) => Andina.MOCK_DATA.productos.find(p => p.id === id))
+      .map(([id]) => todos.find(p => p.id == id || p.id_producto == id))
       .filter(Boolean)
       .filter(p => p.estado !== 'Agotado')
       .slice(0, limit);
@@ -80,6 +92,20 @@ const Recomendaciones = {
       .filter(p => p.estado !== 'Agotado')
       .sort((a, b) => (ventas[b.id] || 0) - (ventas[a.id] || 0))
       .slice(0, limit);
+  },
+
+  // Generar el "Globito" HTML para la tienda
+  generarGlobito(prodId, productosData = null) {
+    const recs = this.parProducto(prodId, productosData, 1);
+    if (recs.length === 0) return '';
+    
+    const rec = recs[0];
+    const nombreCorto = rec.nombre.split(' ').slice(0, 2).join(' '); // Tomar solo 2 primeras palabras
+    return `
+      <div class="recomendacion-bubble" title="Basado en compras de otros clientes">
+        <i class="bi bi-stars"></i> Ideal con: <strong>${nombreCorto}</strong>
+      </div>
+    `;
   },
 
   // Renderizar widget de recomendaciones
