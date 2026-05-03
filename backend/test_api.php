@@ -22,11 +22,13 @@ $data = json_decode(file_get_contents("php://input"), true) ?: $_POST;
 switch ($accion) {
 
     // ==================== REGISTRO ====================
+    case 'registro':
     case 'register':
-        $nombre_completo = trim($data['nombre_completo'] ?? '');
+        $nombre_completo = trim($data['nombre_completo'] ?? $data['nombre'] ?? '');
         $email = trim($data['email'] ?? '');
         $password = $data['password'] ?? '';
-        $confirmar = $data['confirmar_password'] ?? '';
+        $confirmar = trim($data['confirmar_password'] ?? $data['confirm'] ?? '');
+        $username_manual = trim($data['username'] ?? '');
 
         if (empty($nombre_completo) || empty($email) || empty($password)) {
             echo json_encode(["error" => "Todos los campos son requeridos"]); exit();
@@ -64,7 +66,21 @@ switch ($accion) {
             $id_empleado = $db->lastInsertId();
             
             $hash = password_hash($password, PASSWORD_BCRYPT);
-            $username = strtolower(substr($nombre, 0, 1) . str_replace(' ', '', $apellido));
+            if ($username_manual !== '') {
+                $username = strtolower(preg_replace('/[^a-z0-9._-]/i', '', $username_manual));
+                if ($username === '') {
+                    $username = strtolower(substr($nombre, 0, 1) . str_replace(' ', '', $apellido));
+                }
+            } else {
+                $username = strtolower(substr($nombre, 0, 1) . str_replace(' ', '', $apellido));
+            }
+
+            $uq = $db->prepare("SELECT id_usuario FROM usuarios WHERE username = :u LIMIT 1");
+            $uq->bindParam(':u', $username);
+            $uq->execute();
+            if ($uq->rowCount() > 0) {
+                $username = $username . '_' . substr((string) microtime(true), -4);
+            }
             
             $stmt = $db->prepare("INSERT INTO usuarios (id_empleado, id_rol, username, password_hash, email) VALUES (:e, 3, :u, :p, :em)");
             $stmt->bindParam(':e', $id_empleado);
@@ -85,15 +101,19 @@ switch ($accion) {
             
             $db->commit();
             
-            enviarOTP($email, $codigo);
+            $correo_ok = enviarOTP($email, $codigo);
             
-            echo json_encode([
+            $payload = [
                 "exito" => true,
-                "mensaje" => "Usuario registrado",
+                "mensaje" => $correo_ok
+                    ? "Usuario registrado. Revisa tu correo para el código OTP."
+                    : "Usuario registrado. No se pudo enviar el correo (revisa MAIL_* en .env). Usa el código mostrado abajo o el log del servidor.",
                 "id_usuario" => $id_usuario,
                 "username" => $username,
-                "codigo_otp" => $codigo
-            ], JSON_UNESCAPED_UNICODE);
+                "codigo_otp" => $codigo,
+                "email_enviado" => $correo_ok,
+            ];
+            echo json_encode($payload, JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
             if (isset($db)) $db->rollBack();
             echo json_encode(["error" => $e->getMessage()]);
@@ -112,7 +132,14 @@ switch ($accion) {
         try {
             $db = (new Database())->getConnection();
             
-            $stmt = $db->prepare("SELECT u.*, r.nombre as rol, CONCAT(e.nombre, ' ', e.apellido) as nombre_completo FROM usuarios u JOIN roles r ON u.id_rol = r.id_rol JOIN empleados e ON u.id_empleado = e.id_empleado WHERE u.username = :u");
+            $stmt = $db->prepare(
+                "SELECT u.*, r.nombre as rol, " .
+                "COALESCE(NULLIF(TRIM(CONCAT_WS(' ', e.nombre, e.apellido)), ''), u.username) AS nombre_completo " .
+                "FROM usuarios u " .
+                "JOIN roles r ON u.id_rol = r.id_rol " .
+                "LEFT JOIN empleados e ON u.id_empleado = e.id_empleado " .
+                "WHERE u.username = :u"
+            );
             $stmt->bindParam(':u', $username);
             $stmt->execute();
             
@@ -131,9 +158,10 @@ switch ($accion) {
             }
 
             $token = bin2hex(random_bytes(32));
+            $idEmp = $user['id_empleado'];
             $datos = [
                 "id_usuario" => (int) $user['id_usuario'],
-                "id_empleado" => (int) $user['id_empleado'],
+                "id_empleado" => $idEmp !== null && $idEmp !== '' ? (int) $idEmp : null,
                 "username" => $user['username'],
                 "nombre" => $user['nombre_completo'],
                 "rol" => $user['rol'],
@@ -154,16 +182,28 @@ switch ($accion) {
 
     // ==================== VERIFICAR OTP ====================
     case 'verify_otp':
+    case 'verificar_otp':
+        $codigo = trim($data['codigo_otp'] ?? $data['codigo'] ?? '');
         $id = intval($data['id_usuario'] ?? 0);
-        $codigo = trim($data['codigo_otp'] ?? '');
-
-        if ($id <= 0 || strlen($codigo) !== 6) {
-            echo json_encode(["error" => "Datos invalidos"]); exit();
-        }
 
         try {
             $db = (new Database())->getConnection();
-            
+
+            if ($id <= 0 && !empty($data['email'])) {
+                $em = trim($data['email']);
+                $lu = $db->prepare("SELECT id_usuario FROM usuarios WHERE email = :e LIMIT 1");
+                $lu->bindParam(':e', $em);
+                $lu->execute();
+                $row = $lu->fetch(PDO::FETCH_ASSOC);
+                if ($row) {
+                    $id = (int) $row['id_usuario'];
+                }
+            }
+
+            if ($id <= 0 || strlen($codigo) !== 6) {
+                echo json_encode(["error" => "Datos invalidos (email o codigo)"]); exit();
+            }
+
             $stmt = $db->prepare("SELECT id_otp, codigo FROM codigos_otp WHERE id_usuario = :id AND activo = 1 AND expira_en > NOW() ORDER BY creado_en DESC LIMIT 1");
             $stmt->bindParam(':id', $id);
             $stmt->execute();
@@ -197,15 +237,27 @@ switch ($accion) {
 
     // ==================== REENVIAR OTP ====================
     case 'resend_otp':
-        $id = intval($data['id_usuario'] ?? 0);
+    case 'reenviar_otp':
         $email = trim($data['email'] ?? '');
-
-        if ($id <= 0 || empty($email)) {
-            echo json_encode(["error" => "ID y email requeridos"]); exit();
-        }
+        $id = intval($data['id_usuario'] ?? 0);
 
         try {
             $db = (new Database())->getConnection();
+
+            if ($id <= 0 && $email !== '') {
+                $lu = $db->prepare("SELECT id_usuario FROM usuarios WHERE email = :e LIMIT 1");
+                $lu->bindParam(':e', $email);
+                $lu->execute();
+                $row = $lu->fetch(PDO::FETCH_ASSOC);
+                if ($row) {
+                    $id = (int) $row['id_usuario'];
+                }
+            }
+
+            if ($id <= 0 || empty($email)) {
+                echo json_encode(["error" => "Email o usuario no encontrado para reenviar OTP"]); exit();
+            }
+
             $db->beginTransaction();
             
             $stmt = $db->prepare("UPDATE codigos_otp SET activo = 0 WHERE id_usuario = :id AND tipo = 'registro'");
@@ -465,9 +517,12 @@ switch ($accion) {
             "error" => "Accion no especificada",
             "acciones_disponibles" => [
                 "register",
-                "login", 
+                "registro",
+                "login",
                 "verify_otp",
+                "verificar_otp",
                 "resend_otp",
+                "reenviar_otp",
                 "create_producto",
                 "listar_productos",
                 "create_categoria",
