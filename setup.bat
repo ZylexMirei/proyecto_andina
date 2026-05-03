@@ -53,7 +53,8 @@ echo 2. Verifica la configuracion visitando:
 echo    http://localhost/proyecto_andina/verify_setup.php
 echo.
 echo 3. Crea la base de datos:
-echo    mysql -u root -p < schema.sql
+echo    (En CMD)  mysql -u root -p ^< schema.sql
+echo    (En PowerShell) Get-Content schema.sql ^| mysql -u root -p
 echo.
 echo 4. Compila el frontend:
 echo    npm run build

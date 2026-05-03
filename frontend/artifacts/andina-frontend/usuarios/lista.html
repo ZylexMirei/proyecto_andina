@@ -137,7 +137,19 @@ function filtrar() {
   renderUsuarios(filtrado);
 }
 
-renderUsuarios(usuarios);
+// Cargar usuarios reales desde la base de datos
+async function cargarUsuariosReales() {
+  const respuesta = await Andina.apiRequest('listar_usuarios', {}, 'GET');
+  if (respuesta.exito) {
+    usuarios = respuesta.usuarios; // Actualizar la variable global
+    renderUsuarios(usuarios);
+  } else {
+    Andina.showToast('Error al cargar la base de datos', 'error');
+    renderUsuarios(usuarios); // Fallback a MOCK_DATA
+  }
+}
+
+cargarUsuariosReales();
 
 function abrirCambioRol(id) {
   editUserId=id;

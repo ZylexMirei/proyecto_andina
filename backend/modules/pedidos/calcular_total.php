@@ -73,9 +73,12 @@ try {
 
     $resultado = $stmt->fetch();
 
-    // Calcular impuesto (ejemplo: 13% IVA)
+    // Cargar configuración de la aplicación para valores como el IVA
+    $config = require __DIR__ . '/../../config/app.php';
+    $porcentaje_iva = $config['impuestos']['iva_porcentaje'];
+
     $subtotal = floatval($resultado['subtotal']);
-    $impuesto = $subtotal * 0.13;
+    $impuesto = $subtotal * ($porcentaje_iva / 100);
     $total = $subtotal + $impuesto;
 
     // Obtener detalles individuales
@@ -101,7 +104,7 @@ try {
             "total_unidades" => intval($resultado['total_unidades']),
             "subtotal" => round($subtotal, 2),
             "impuesto" => round($impuesto, 2),
-            "impuesto_porcentaje" => 13,
+            "impuesto_porcentaje" => $porcentaje_iva,
             "total_pedido" => round($total, 2),
             "lineas_detalle" => intval($resultado['lineas_detalle']),
             "precio_minimo" => floatval($resultado['precio_minimo']),

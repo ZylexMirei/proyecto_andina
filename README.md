@@ -19,7 +19,30 @@ Sistema de gestión para operaciones, inventario y ventas. Backend en PHP (MySQL
 1. Copiar `.env.example` a `.env` y completar credenciales.
 2. PHP: `cd backend` y `composer install`.
 3. Frontend: `cd frontend/artifacts/andina-frontend`, luego `npm install` y `npm run build`.
-4. Revisar en el navegador: `verify_setup.php` (misma raíz del proyecto que sirve el servidor web).
+4. Crear la base de datos. Abre una terminal en la raíz del proyecto y ejecuta el comando correspondiente a tu terminal:
+   - **CMD (Command Prompt):** `mysql -u root -p < schema.sql`
+   - **PowerShell:** `Get-Content schema.sql | mysql -u root -p`
+5. Revisar en el navegador: `verify_setup.php` (misma raíz del proyecto que sirve el servidor web).
+
+## Cómo Ejecutar (Desarrollo)
+
+Para trabajar en el proyecto, necesitas tener tanto el backend (PHP) como el frontend (Vite) corriendo simultáneamente.
+
+1.  **Iniciar el Backend (Servidor Web):**
+    -   Asegúrate de que tu servidor web (XAMPP, WAMP, etc.) esté en ejecución con **Apache y MySQL iniciados**.
+    -   El backend estará disponible en `http://localhost/proyecto_andina/`.
+
+2.  **Iniciar el Frontend (Servidor de Desarrollo):**
+    -   Abre una **nueva terminal**.
+    -   Navega a la carpeta del frontend: `cd frontend/artifacts/andina-frontend`
+    -   Ejecuta el comando: `npm run dev`
+    -   La terminal te mostrará una URL local, generalmente `http://localhost:5173/`.
+
+3.  **¡Usa esta última URL (`http://localhost:5173/`) en tu navegador para ver y probar la aplicación!**
+
+El servidor de desarrollo de Vite reenviará automáticamente las peticiones de la API al backend de PHP, por lo que todo funcionará en conjunto.
+
+**Nota sobre `php -S` (Método sin XAMPP/Apache):** Puedes correr el backend con el servidor integrado de PHP (`php -S localhost:8080` desde la raíz). Para que esto funcione, el frontend necesita saber a dónde enviar las peticiones de la API. Abre el archivo `frontend/artifacts/andina-frontend/vite.config.ts` y asegúrate de que la sección `server.proxy` redirige todas las rutas de la API (como `/backend/` y `/test_api.php`) a tu servidor PHP, por ejemplo: `target: 'http://localhost:8080'`.
 
 ## Variables de entorno (`.env` en la raíz)
 
@@ -71,7 +94,7 @@ proyecto_andina/
 
 ## Problemas frecuentes
 
-- **MySQL:** comprobar puerto (p. ej. 3308) y que el servicio esté en marcha.
+- **MySQL:** Comprobar puerto (p. ej. 3308) y que el servicio esté en marcha. El comando de importación `mysql ... < schema.sql` es para `cmd.exe`; en **PowerShell** el equivalente es `Get-Content schema.sql | mysql ...`.
 - **Correo:** contraseña de aplicación, no la clave normal de la cuenta.
 - **CORS:** el origen del front debe figurar en `ALLOWED_ORIGINS`.
 

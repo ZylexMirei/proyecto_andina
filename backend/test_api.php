@@ -9,6 +9,15 @@
  */
 
 header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+
+// Manejar solicitudes preflight (OPTIONS) del frontend de forma limpia
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
@@ -28,16 +37,12 @@ switch ($accion) {
         $email = trim($data['email'] ?? '');
         $password = $data['password'] ?? '';
         $confirmar = trim($data['confirmar_password'] ?? $data['confirm'] ?? '');
-        $username_manual = trim($data['username'] ?? '');
 
         if (empty($nombre_completo) || empty($email) || empty($password)) {
             echo json_encode(["error" => "Todos los campos son requeridos"]); exit();
         }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             echo json_encode(["error" => "Email no valido"]); exit();
-        }
-        if ($password !== $confirmar) {
-            echo json_encode(["error" => "Las contraseñas no coinciden"]); exit();
         }
         if (strlen($password) < 8) {
             echo json_encode(["error" => "Minimo 8 caracteres"]); exit();
@@ -59,61 +64,62 @@ switch ($accion) {
             $nombre = $nombres[0];
             $apellido = $nombres[1] ?? '';
             
-            $stmt = $db->prepare("INSERT INTO empleados (nombre, apellido) VALUES (:n, :a)");
-            $stmt->bindParam(':n', $nombre);
-            $stmt->bindParam(':a', $apellido);
-            $stmt->execute();
-            $id_empleado = $db->lastInsertId();
+            // 1. Registrar a la persona en la tabla de clientes
+            $stmtC = $db->prepare("INSERT INTO clientes (razon_social, nit_ci, telefono, email) VALUES (:r, :n, :t, :e)");
+            $stmtC->bindValue(':r', $nombre_completo);
+            $stmtC->bindValue(':n', '');
+            $stmtC->bindValue(':t', '');
+            $stmtC->bindValue(':e', $email);
+            $stmtC->execute();
             
             $hash = password_hash($password, PASSWORD_BCRYPT);
-            if ($username_manual !== '') {
-                $username = strtolower(preg_replace('/[^a-z0-9._-]/i', '', $username_manual));
-                if ($username === '') {
-                    $username = strtolower(substr($nombre, 0, 1) . str_replace(' ', '', $apellido));
-                }
-            } else {
-                $username = strtolower(substr($nombre, 0, 1) . str_replace(' ', '', $apellido));
+            
+            $base_username = strtolower(substr($nombre, 0, 1) . preg_replace('/[^a-z0-9]/i', '', $apellido));
+            if (empty($base_username)) { $base_username = strtolower(preg_replace('/[^a-z0-9]/i', '', explode('@', $email)[0])); }
+            $username = $base_username;
+            $counter = 1;
+            $userCheckStmt = $db->prepare("SELECT id_usuario FROM usuarios WHERE username = :username");
+            do {
+                $userCheckStmt->bindValue(':username', $username);
+                $userCheckStmt->execute();
+                if ($userCheckStmt->rowCount() > 0) $username = $base_username . $counter++;
+            } while ($userCheckStmt->rowCount() > 0);
+            
+            // 2. Crear credenciales de usuario (Rol 4 = Cliente)
+            try {
+                $stmt = $db->prepare("INSERT INTO usuarios (id_empleado, id_rol, username, password_hash, email) VALUES (NULL, 4, :u, :p, :em)");
+                $stmt->bindValue(':u', $username);
+                $stmt->bindValue(':p', $hash);
+                $stmt->bindValue(':em', $email);
+                $stmt->execute();
+                $id_usuario = $db->lastInsertId();
+            } catch (PDOException $e) {
+                // Fallback si la BD requiere id_empleado obligatoriamente
+                $stmtE = $db->prepare("INSERT INTO empleados (nombre, apellido) VALUES (:n, :a)");
+                $stmtE->bindValue(':n', $nombre);
+                $stmtE->bindValue(':a', $apellido);
+                $stmtE->execute();
+                $id_emp = $db->lastInsertId();
+                
+                $stmt = $db->prepare("INSERT INTO usuarios (id_empleado, id_rol, username, password_hash, email) VALUES (:e, 4, :u, :p, :em)");
+                $stmt->bindValue(':e', $id_emp);
+                $stmt->bindValue(':u', $username);
+                $stmt->bindValue(':p', $hash);
+                $stmt->bindValue(':em', $email);
+                $stmt->execute();
+                $id_usuario = $db->lastInsertId();
             }
-
-            $uq = $db->prepare("SELECT id_usuario FROM usuarios WHERE username = :u LIMIT 1");
-            $uq->bindParam(':u', $username);
-            $uq->execute();
-            if ($uq->rowCount() > 0) {
-                $username = $username . '_' . substr((string) microtime(true), -4);
-            }
             
-            $stmt = $db->prepare("INSERT INTO usuarios (id_empleado, id_rol, username, password_hash, email) VALUES (:e, 3, :u, :p, :em)");
-            $stmt->bindParam(':e', $id_empleado);
-            $stmt->bindParam(':u', $username);
-            $stmt->bindParam(':p', $hash);
-            $stmt->bindParam(':em', $email);
-            $stmt->execute();
-            $id_usuario = $db->lastInsertId();
-            
-            $codigo = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-            $expira = date('Y-m-d H:i:s', strtotime('+10 minutes'));
-            
-            $stmt = $db->prepare("INSERT INTO codigos_otp (id_usuario, codigo, tipo, expira_en) VALUES (:id, :cod, 'registro', :exp)");
-            $stmt->bindParam(':id', $id_usuario);
-            $stmt->bindParam(':cod', $codigo);
-            $stmt->bindParam(':exp', $expira);
-            $stmt->execute();
-            
+            $codigo_otp = manejarOTP($db, $id_usuario, $email, 'registro');
             $db->commit();
             
-            $correo_ok = enviarOTP($email, $codigo);
-            
-            $payload = [
+            echo json_encode([
                 "exito" => true,
-                "mensaje" => $correo_ok
-                    ? "Usuario registrado. Revisa tu correo para el código OTP."
-                    : "Usuario registrado. No se pudo enviar el correo (revisa MAIL_* en .env). Usa el código mostrado abajo o el log del servidor.",
+                "mensaje" => "Usuario registrado. Revisa tu correo para el código OTP.",
                 "id_usuario" => $id_usuario,
                 "username" => $username,
-                "codigo_otp" => $codigo,
-                "email_enviado" => $correo_ok,
-            ];
-            echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+                "email" => $email
+            ], JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
             if (isset($db)) $db->rollBack();
             echo json_encode(["error" => $e->getMessage()]);
@@ -138,9 +144,10 @@ switch ($accion) {
                 "FROM usuarios u " .
                 "JOIN roles r ON u.id_rol = r.id_rol " .
                 "LEFT JOIN empleados e ON u.id_empleado = e.id_empleado " .
-                "WHERE u.username = :u"
+                "WHERE (u.username = :u1 OR u.email = :u2)"
             );
-            $stmt->bindParam(':u', $username);
+            $stmt->bindValue(':u1', $username);
+            $stmt->bindValue(':u2', $username);
             $stmt->execute();
             
             if ($stmt->rowCount() === 0) {
@@ -219,10 +226,12 @@ switch ($accion) {
             }
             
             $db->beginTransaction();
+            // Invalidar el OTP usado
             $stmt = $db->prepare("UPDATE codigos_otp SET activo = 0 WHERE id_otp = :id");
             $stmt->bindParam(':id', $otp['id_otp']);
             $stmt->execute();
             
+            // Marcar el email del usuario como verificado
             $stmt = $db->prepare("UPDATE usuarios SET email_verificado = 1 WHERE id_usuario = :id");
             $stmt->bindParam(':id', $id);
             $stmt->execute();
@@ -259,27 +268,13 @@ switch ($accion) {
             }
 
             $db->beginTransaction();
-            
-            $stmt = $db->prepare("UPDATE codigos_otp SET activo = 0 WHERE id_usuario = :id AND tipo = 'registro'");
-            $stmt->bindParam(':id', $id);
-            $stmt->execute();
-            
-            $codigo = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-            $expira = date('Y-m-d H:i:s', strtotime('+10 minutes'));
-            
-            $stmt = $db->prepare("INSERT INTO codigos_otp (id_usuario, codigo, tipo, expira_en) VALUES (:id, :cod, 'registro', :exp)");
-            $stmt->bindParam(':id', $id);
-            $stmt->bindParam(':cod', $codigo);
-            $stmt->bindParam(':exp', $expira);
-            $stmt->execute();
-            
+            // Usar la función centralizada para reenviar el OTP
+            $codigo_otp = manejarOTP($db, $id, $email, 'registro');
             $db->commit();
-            enviarOTP($email, $codigo);
-            
+
             echo json_encode([
                 "exito" => true,
-                "mensaje" => "Nuevo codigo enviado a {$email}",
-                "codigo_otp" => $codigo
+                "mensaje" => "Nuevo código enviado a {$email}"
             ], JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
             if (isset($db)) $db->rollBack();
@@ -512,6 +507,14 @@ switch ($accion) {
         }
         break;
 
+    // ==================== LOGOUT ====================
+    case 'logout':
+        echo json_encode([
+            "exito" => true,
+            "mensaje" => "Sesión cerrada correctamente"
+        ], JSON_UNESCAPED_UNICODE);
+        break;
+
     default:
         echo json_encode([
             "error" => "Accion no especificada",
@@ -531,6 +534,7 @@ switch ($accion) {
                 "create_cliente",
                 "listar_clientes",
                 "create_almacen",
+                "listar_usuarios",
                 "dashboard"
             ]
         ], JSON_UNESCAPED_UNICODE);

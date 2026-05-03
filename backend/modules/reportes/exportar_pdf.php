@@ -17,6 +17,7 @@ $fecha_hasta = sanitizar_input($_GET['fecha_hasta'] ?? '');
 try {
     $database = new Database();
     $db = $database->getConnection();
+    $params = [];
 
     switch ($tipo) {
         case 'inventario':
@@ -32,7 +33,8 @@ try {
                       JOIN productos p ON i.id_producto = p.id_producto
                       JOIN almacenes a ON i.id_almacen = a.id_almacen";
             if ($id_almacen > 0) {
-                $query .= " WHERE i.id_almacen = " . $id_almacen;
+                $query .= " WHERE i.id_almacen = :id_almacen";
+                $params[':id_almacen'] = $id_almacen;
             }
             $query .= " ORDER BY a.nombre, p.nombre";
             $titulo = "REPORTE DE INVENTARIO";
@@ -46,9 +48,15 @@ try {
                       FROM pedidos p
                       JOIN clientes c ON p.id_cliente = c.id_cliente
                       JOIN detalle_pedido dp ON p.id_pedido = dp.id_pedido";
-            $where = [];
-            if (!empty($fecha_desde)) $where[] = "p.fecha_pedido >= '{$fecha_desde}'";
-            if (!empty($fecha_hasta)) $where[] = "p.fecha_pedido <= '{$fecha_hasta}'";
+            $where = []; // Usaremos un array para construir la cláusula WHERE
+            if (!empty($fecha_desde)) {
+                $where[] = "p.fecha_pedido >= :fecha_desde";
+                $params[':fecha_desde'] = $fecha_desde;
+            }
+            if (!empty($fecha_hasta)) {
+                $where[] = "p.fecha_pedido <= :fecha_hasta";
+                $params[':fecha_hasta'] = $fecha_hasta;
+            }
             if (!empty($where)) $query .= " WHERE " . implode(' AND ', $where);
             $query .= " GROUP BY p.id_pedido ORDER BY p.fecha_pedido DESC";
             $titulo = "REPORTE DE PEDIDOS";
@@ -64,8 +72,14 @@ try {
                       JOIN pedidos pe ON dp.id_pedido = pe.id_pedido
                       JOIN productos p ON dp.id_producto = p.id_producto
                       WHERE pe.estado != 'Cancelado'";
-            if (!empty($fecha_desde)) $query .= " AND pe.fecha_pedido >= '{$fecha_desde}'";
-            if (!empty($fecha_hasta)) $query .= " AND pe.fecha_pedido <= '{$fecha_hasta}'";
+            if (!empty($fecha_desde)) {
+                $query .= " AND pe.fecha_pedido >= :fecha_desde";
+                $params[':fecha_desde'] = $fecha_desde;
+            }
+            if (!empty($fecha_hasta)) {
+                $query .= " AND pe.fecha_pedido <= :fecha_hasta";
+                $params[':fecha_hasta'] = $fecha_hasta;
+            }
             $query .= " GROUP BY dp.id_producto ORDER BY ingresos DESC LIMIT 50";
             $titulo = "REPORTE DE VENTAS POR PRODUCTO";
             $headers = ['Código', 'Producto', 'Und. Vendidas', 'Ingresos', 'Pedidos'];
@@ -77,7 +91,7 @@ try {
     }
 
     $stmt = $db->prepare($query);
-    $stmt->execute();
+    $stmt->execute($params);
     $datos = $stmt->fetchAll();
 
     // Como no tenemos FPDF/TCPDF instalado, generamos HTML que se puede imprimir como PDF

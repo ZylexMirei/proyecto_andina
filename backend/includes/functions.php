@@ -1,6 +1,5 @@
 <?php
 // includes/functions.php
-session_start();
 
 // Cargar variables de entorno
 require_once __DIR__ . '/../config/env.php';
@@ -65,6 +64,37 @@ function verificarCSRF($token) {
 
 function generarOTP() {
     return str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+}
+
+function manejarOTP(PDO $db, int $id_usuario, string $email, string $tipo = 'registro') {
+    $config = require __DIR__ . '/../config/app.php';
+    $duracion_minutos = $config['otp']['duracion_minutos'] ?? 10;
+
+    // 1. Invalidar OTPs anteriores del mismo tipo para ese usuario
+    $invalidateQuery = "UPDATE codigos_otp SET activo = 0 WHERE id_usuario = :id_usuario AND tipo = :tipo";
+    $invalidateStmt = $db->prepare($invalidateQuery);
+    $invalidateStmt->bindParam(':id_usuario', $id_usuario);
+    $invalidateStmt->bindParam(':tipo', $tipo);
+    $invalidateStmt->execute();
+
+    // 2. Generar y guardar el nuevo OTP
+    $codigo_otp = generarOTP();
+    $expira_en = date('Y-m-d H:i:s', strtotime("+{$duracion_minutos} minutes"));
+
+    $insertQuery = "INSERT INTO codigos_otp (id_usuario, codigo, tipo, expira_en) 
+                    VALUES (:id_usuario, :codigo, :tipo, :expira_en)";
+    $insertStmt = $db->prepare($insertQuery);
+    $insertStmt->bindParam(':id_usuario', $id_usuario);
+    $insertStmt->bindParam(':codigo', $codigo_otp);
+    $insertStmt->bindParam(':tipo', $tipo);
+    $insertStmt->bindParam(':expira_en', $expira_en);
+    $insertStmt->execute();
+
+    // 3. Enviar el correo
+    enviarCorreoOTP($email, $codigo_otp);
+
+    // Retornar el código generado para poder mostrarlo en logs o respuestas de API si es necesario
+    return $codigo_otp;
 }
 
 function enviarCorreoOTP($email, $codigo_otp) {

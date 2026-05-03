@@ -2,6 +2,9 @@
 # =========================================
 # Script de Configuración Inicial - Linux/Mac
 # =========================================
+# Termina el script si un comando falla
+set -e
+
 # Este script prepara el proyecto para desarrollo
 
 echo ""
@@ -34,9 +37,7 @@ if [ -d "frontend/artifacts/andina-frontend/node_modules" ]; then
     echo "[3/3] Dependencias Frontend ya instaladas."
 else
     echo "[3/3] Instalando dependencias Frontend..."
-    cd frontend/artifacts/andina-frontend
-    npm install
-    cd ../../..
+    (cd frontend/artifacts/andina-frontend && npm install)
 fi
 
 echo ""

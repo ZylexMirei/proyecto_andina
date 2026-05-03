@@ -32,17 +32,32 @@ try {
     $database = new Database();
     $db = $database->getConnection();
 
-    $checkQuery = "SELECT id_usuario FROM usuarios WHERE email = :email OR username = :username";
+    // 1. Verificar si el email ya existe, ya que debe ser único.
+    $checkQuery = "SELECT id_usuario FROM usuarios WHERE email = :email";
     $checkStmt = $db->prepare($checkQuery);
-    $nombres = explode(' ', $nombre_completo, 2);
-    $username_temp = strtolower(substr($nombres[0], 0, 1) . str_replace(' ', '', $nombres[1] ?? ''));
     $checkStmt->bindParam(':email', $email);
-    $checkStmt->bindParam(':username', $username_temp);
     $checkStmt->execute();
 
     if ($checkStmt->rowCount() > 0) {
-        responderJSON(["error" => "El email o usuario ya existe"], 409);
+        responderJSON(["error" => "El email ya se encuentra registrado"], 409);
     }
+
+    // 2. Generar un nombre de usuario único de forma más robusta.
+    $nombres = explode(' ', $nombre_completo, 2);
+    $base_username = strtolower(substr($nombres[0], 0, 1) . preg_replace('/[^a-z0-9]/i', '', $nombres[1] ?? ''));
+    if (empty($base_username)) { // Fallback si el nombre es inusual
+        $base_username = strtolower(preg_replace('/[^a-z0-9]/i', '', explode('@', $email)[0]));
+    }
+
+    $username_temp = $base_username;
+    $counter = 1;
+    $userCheckQuery = "SELECT id_usuario FROM usuarios WHERE username = :username";
+    $userCheckStmt = $db->prepare($userCheckQuery);
+    do {
+        $userCheckStmt->bindParam(':username', $username_temp);
+        $userCheckStmt->execute();
+        if ($userCheckStmt->rowCount() > 0) $username_temp = $base_username . $counter++;
+    } while ($userCheckStmt->rowCount() > 0);
 
     $db->beginTransaction();
 
@@ -55,8 +70,9 @@ try {
     $stmtEmpleado->execute();
     $id_empleado = $db->lastInsertId();
 
+    $config = require __DIR__ . '/../../config/app.php';
     $password_hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 10]);
-    $rol_empleado = 3;
+    $rol_empleado = $config['roles']['default_empleado'];
 
     $queryUsuario = "INSERT INTO usuarios (id_empleado, id_rol, username, password_hash, email) 
                      VALUES (:id_empleado, :id_rol, :username, :password_hash, :email)";
@@ -88,7 +104,8 @@ try {
         "exito" => true,
         "mensaje" => "Usuario registrado. Verifique su correo con el código OTP.",
         "id_usuario" => $id_usuario,
-        "email" => $email
+        "email" => $email,
+        "username" => $username_temp
     ], 201);
 
 } catch (Exception $e) {
