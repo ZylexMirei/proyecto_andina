@@ -109,7 +109,8 @@ async function verificarCodigo(){
   document.getElementById('verifyBtn').disabled=true;
   document.getElementById('verifyBtn').innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Verificando...';
   
-  const res=await Andina.apiRequest('verificar_otp',{email,codigo});
+  const uid=localStorage.getItem('andina_otp_uid');
+  const res=await Andina.apiRequest('verificar_otp',{email,codigo,id_usuario:uid?parseInt(uid,10):undefined});
   
   if(res.exito||codigo==='123456'){
     clearInterval(timer);
