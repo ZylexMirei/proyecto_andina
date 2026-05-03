@@ -5,20 +5,19 @@ Sistema de gestión para operaciones, inventario y ventas. Backend en PHP (MySQL
 ## Requisitos
 
 - PHP 7.4+ (extensiones: `pdo_mysql`, `json`, `mbstring`)
-- MySQL 5.7+ / MariaDB
+- MySQL 5.7+ / MySQL Worckbench
 - Composer
 - Node.js 18+ y npm (solo para compilar el frontend)
 
 ## Puesta en marcha
 
 **Windows:** `setup.bat`  
-**Linux / macOS:** `chmod +x setup.sh` y `./setup.sh`
 
 **Manual**
 
 1. Copiar `.env.example` a `.env` y completar credenciales.
 2. PHP: `cd backend` y `composer install`.
-3. Frontend: `cd frontend/artifacts/andina-frontend`, luego `npm install` y `npm run build`.
+3. Frontend: `cd frontend/artifacts/andina-frontend`, luego `npm run dev`.
 4. Revisar en el navegador: `verify_setup.php` (misma raíz del proyecto que sirve el servidor web).
 
 ## Variables de entorno (`.env` en la raíz)
