@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0f1e">
+  <style>html{background:#0a0f1e}</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Carrito — Distribuidora Andina SRL</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="../assets/css/custom.css" rel="stylesheet">
+  <style>
+    body {
+      background: #0a0f1e;
+      background-image:
+        radial-gradient(ellipse 70% 40% at 10% 0%, rgba(37,99,235,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 90% 100%, rgba(0,168,89,0.04) 0%, transparent 60%);
+      background-attachment: fixed;
+      color: #e2e8f0;
+      font-family: 'Space Grotesk', 'Inter', sans-serif;
+    }
+
+    /* NAV */
+    .carrito-nav {
+      background: rgba(10,15,30,0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 14px 28px;
+      display: flex; align-items: center; gap: 16px;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+    }
+    .nav-brand-name {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+      font-size: 15px; color: #fff;
+    }
+    .nav-brand-name .accent { background: linear-gradient(135deg,#00c6ff,#38ef7d); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+
+    /* PAGE TITLE */
+    .page-title { font-family:'Space Grotesk',sans-serif; font-weight:800; font-size:26px; color:#f1f5f9; letter-spacing:-0.5px; }
+    .page-title i { color:#00c6ff; }
+
+    /* CART ITEM CARD */
+    .carrito-card {
+      background: #111827;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px; overflow: hidden;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+    }
+    .carrito-item {
+      display: flex; align-items: center; gap: 16px;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      transition: background .2s;
+    }
+    .carrito-item:last-child { border-bottom: none; }
+    .carrito-item:hover { background: rgba(255,255,255,0.02); }
+
+    .item-img {
+      width: 72px; height: 72px; border-radius: 12px; flex-shrink: 0;
+      overflow: hidden; background: #0f172a;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .item-img img { width:100%; height:100%; object-fit:cover; }
+    .item-placeholder { font-size:26px; font-weight:800; color:#1e293b; }
+
+    .item-name { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; color:#e2e8f0; margin-bottom:3px; }
+    .item-cat { font-size:12px; color:#475569; margin-bottom:4px; }
+    .item-unit-price { font-size:13.5px; font-weight:600; color:#38ef7d; }
+
+    /* QTY CONTROL */
+    .qty-control { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+    .qty-btn {
+      width: 32px; height: 32px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: #131c30;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all .2s; font-size: 18px; color: #64748b;
+    }
+    .qty-btn:hover { border-color: rgba(0,198,255,0.4); color: #00c6ff; background: #162035; }
+    .qty-num { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; color:#e2e8f0; min-width:28px; text-align:center; }
+
+    .item-total { min-width:90px; text-align:right; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; color:#f1f5f9; }
+    .btn-quitar { background:transparent; border:1px solid rgba(239,68,68,0.2); color:#64748b; border-radius:8px; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all .2s; flex-shrink:0; }
+    .btn-quitar:hover { border-color:rgba(239,68,68,0.5); color:#f87171; background:rgba(239,68,68,0.08); }
+
+    /* CUPON CARD */
+    .cupon-card {
+      background: #111827; border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px; padding: 18px; margin-top: 14px;
+    }
+    .cupon-label { font-size:13.5px; font-weight:600; color:#94a3b8; margin-bottom:12px; }
+    .cupon-input {
+      background: #131c30 !important; border: 1px solid rgba(255,255,255,0.08) !important;
+      color: #e2e8f0 !important; border-radius: 10px 0 0 10px !important;
+      font-family:'Space Grotesk',sans-serif !important; font-size:13px !important;
+    }
+    .cupon-input::placeholder { color:#334155; }
+    .cupon-input:focus { border-color:rgba(0,198,255,0.4) !important; box-shadow:0 0 0 3px rgba(0,198,255,0.08) !important; outline:none; }
+    .btn-cupon { background:rgba(56,239,125,0.1); border:1px solid rgba(56,239,125,0.2); color:#38ef7d; font-family:'Space Grotesk',sans-serif; font-weight:600; border-radius:0 10px 10px 0; padding:0 16px; cursor:pointer; transition:all .2s; }
+    .btn-cupon:hover { background:rgba(56,239,125,0.18); }
+
+    /* SUMMARY CARD */
+    .resumen-card {
+      background: #111827;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px; overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+      position: sticky; top: 80px;
+    }
+    .resumen-header {
+      background: linear-gradient(135deg,#0f172a,#162035);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 16px 20px;
+      font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; color:#94a3b8;
+      text-transform:uppercase; letter-spacing:.6px;
+    }
+    .resumen-body { padding: 20px; }
+    .resumen-line { display:flex; justify-content:space-between; align-items:center; font-size:13.5px; color:#64748b; margin-bottom:10px; }
+    .resumen-line strong { color:#e2e8f0; }
+    .resumen-line.descuento { color:#38ef7d; }
+    .resumen-line.descuento strong { color:#38ef7d; }
+    .resumen-divider { border-color: rgba(255,255,255,0.07); margin: 14px 0; }
+    .resumen-total { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+    .resumen-total-label { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; color:#e2e8f0; }
+    .resumen-total-val { font-family:'Space Grotesk',sans-serif; font-weight:800; font-size:24px; color:#38ef7d; }
+
+    .btn-confirmar {
+      width:100%; padding:14px; border:none; border-radius:12px;
+      background: linear-gradient(135deg,#00a859,#00c6ff);
+      color:#fff; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;
+      cursor:pointer; transition:all .2s; box-shadow:0 4px 20px rgba(0,168,89,0.25);
+      display:flex; align-items:center; justify-content:center; gap:8px;
+    }
+    .btn-confirmar:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(0,168,89,0.35); }
+    .btn-confirmar:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
+    .btn-vaciar { width:100%; padding:9px; border:1px solid rgba(239,68,68,0.2); color:#64748b; background:transparent; border-radius:10px; font-family:'Space Grotesk',sans-serif; font-size:13px; cursor:pointer; transition:all .2s; margin-top:10px; }
+    .btn-vaciar:hover { border-color:rgba(239,68,68,0.4); color:#f87171; background:rgba(239,68,68,0.06); }
+
+    .secure-badge { display:flex; align-items:center; justify-content:center; gap:6px; font-size:12px; color:#334155; margin-top:14px; }
+
+    /* EMPTY */
+    .empty-icon { font-size:64px; color:#1e293b; }
+    .empty-title { color:#334155; font-family:'Space Grotesk',sans-serif; }
+    .empty-sub { color:#1e293b; font-size:13.5px; }
+
+    /* NAV BUTTONS */
+    .btn-outline-secondary { border-color:rgba(255,255,255,0.1); color:#64748b; background:transparent; }
+    .btn-outline-secondary:hover { background:rgba(255,255,255,0.05); color:#94a3b8; border-color:rgba(255,255,255,0.15); }
+
+    .resumen-item-row { display:flex; justify-content:space-between; font-size:12.5px; color:#475569; margin-bottom:8px; }
+    .resumen-item-row strong { color:#94a3b8; }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="carrito-nav">
+  <a href="tienda.html" class="d-flex align-items-center gap-3 text-decoration-none">
+    <div style="width:38px;height:38px;position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <div style="position:absolute;inset:0;border-radius:10px;background:linear-gradient(#0a0f1e,#0a0f1e) padding-box,linear-gradient(135deg,#00c6ff,#38ef7d) border-box;border:2px solid transparent;box-shadow:0 0 12px rgba(0,198,255,0.18);"></div>
+      <span style="position:relative;z-index:1;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;background:linear-gradient(135deg,#00c6ff,#38ef7d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">DA</span>
+    </div>
+    <span class="nav-brand-name">Distribuidora <span class="accent">Andina</span></span>
+  </a>
+  <div class="flex-grow-1"></div>
+  <a href="tienda.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Seguir comprando</a>
+</nav>
+
+<div class="container py-4" style="max-width:1100px;">
+  <h2 class="page-title mb-4"><i class="bi bi-cart3 me-2"></i>Mi Carrito</h2>
+
+  <div class="row g-4">
+    <!-- Items -->
+    <div class="col-lg-8">
+      <div id="carritoItems"></div>
+
+      <div id="emptyCarrito" class="d-none text-center py-5">
+        <i class="bi bi-cart-x empty-icon"></i>
+        <h4 class="mt-3 empty-title">Tu carrito está vacío</h4>
+        <p class="empty-sub">Explora nuestro catálogo y encuentra lo que necesitas</p>
+        <a href="tienda.html" class="btn btn-success btn-lg mt-2"><i class="bi bi-shop me-2"></i>Ir a la tienda</a>
+      </div>
+
+      <!-- Cupón -->
+      <div class="cupon-card" id="cuponCard">
+        <div class="cupon-label"><i class="bi bi-tag me-2" style="color:#38ef7d;"></i>¿Tienes un cupón de descuento?</div>
+        <div class="input-group">
+          <input type="text" class="form-control cupon-input" id="cuponInput" placeholder="ANDINA2026, DESCUENTO10...">
+          <button class="btn-cupon" onclick="aplicarCupon()"><i class="bi bi-check-circle me-1"></i>Aplicar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resumen -->
+    <div class="col-lg-4">
+      <div class="resumen-card">
+        <div class="resumen-header"><i class="bi bi-receipt me-2"></i>Resumen del pedido</div>
+        <div class="resumen-body">
+          <div id="resumenItems" class="mb-3"></div>
+          <hr class="resumen-divider">
+          <div class="resumen-line"><span>Subtotal</span><strong id="resSubtotal">Bs. 0.00</strong></div>
+          <div class="resumen-line"><span>IVA (13%)</span><strong id="resIva">Bs. 0.00</strong></div>
+          <div id="resDescuentoRow" class="resumen-line descuento d-none"><span>Descuento</span><strong id="resDescuento">-Bs. 0.00</strong></div>
+          <div class="resumen-line"><span>Envío</span><strong style="color:#38ef7d;">Gratis</strong></div>
+          <hr class="resumen-divider">
+          <div class="resumen-total">
+            <span class="resumen-total-label">Total</span>
+            <span class="resumen-total-val" id="resTotal">Bs. 0.00</span>
+          </div>
+
+          <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarPedido()">
+            <i class="bi bi-check-circle"></i>Confirmar pedido
+          </button>
+          <button class="btn-vaciar" onclick="vaciarCarrito()"><i class="bi bi-trash me-1"></i>Vaciar carrito</button>
+          <div class="secure-badge"><i class="bi bi-shield-lock"></i>Compra segura y garantizada</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="../assets/js/app.js"></script>
+<script src="../assets/js/carrito.js"></script>
+<script>
+const session = Andina.requireClienteAuth();
+if(!session) throw new Error('no session');
+
+let descuentoPct = 0;
+
+function renderCarrito() {
+  const items = Carrito.obtener();
+  const container = document.getElementById('carritoItems');
+  const empty = document.getElementById('emptyCarrito');
+  const cuponCard = document.getElementById('cuponCard');
+  const btnConfirmar = document.getElementById('btnConfirmar');
+
+  if(!items.length){
+    container.innerHTML='';
+    empty.classList.remove('d-none');
+    cuponCard.style.display='none';
+    btnConfirmar.disabled=true;
+    calcTotales(); return;
+  }
+
+  empty.classList.add('d-none');
+  cuponCard.style.display='';
+  btnConfirmar.disabled=false;
+
+  container.innerHTML = `<div class="carrito-card">` +
+    items.map(item => `
+      <div class="carrito-item" id="item${item.id}">
+        <div class="item-img flex-shrink-0">
+          ${item.imagen
+            ? `<img src="${item.imagen}" alt="${item.nombre}">`
+            : `<div class="item-placeholder">${item.nombre.charAt(0)}</div>`}
+        </div>
+        <div class="flex-grow-1">
+          <div class="item-name">${item.nombre}</div>
+          <div class="item-cat">${item.categoria}</div>
+          <div class="item-unit-price">${Andina.formatBs(item.precio)} / u.</div>
+        </div>
+        <div class="qty-control">
+          <div class="qty-btn" onclick="cambiarCant(${item.id},-1)">−</div>
+          <div class="qty-num">${item.cantidad}</div>
+          <div class="qty-btn" onclick="cambiarCant(${item.id},1)">+</div>
+        </div>
+        <div class="item-total">${Andina.formatBs(item.precio*item.cantidad)}</div>
+        <div class="btn-quitar" onclick="quitarItem(${item.id})" title="Quitar"><i class="bi bi-trash3" style="font-size:13px;"></i></div>
+      </div>`
+    ).join('') + `</div>`;
+
+  calcTotales();
+}
+
+function calcTotales() {
+  const sub = Carrito.subtotal();
+  const iva = sub * 0.13;
+  const descuento = sub * (descuentoPct/100);
+  const total = sub + iva - descuento;
+
+  document.getElementById('resSubtotal').textContent = Andina.formatBs(sub);
+  document.getElementById('resIva').textContent = Andina.formatBs(iva);
+  document.getElementById('resTotal').textContent = Andina.formatBs(total);
+
+  if(descuento>0){
+    document.getElementById('resDescuentoRow').classList.remove('d-none');
+    document.getElementById('resDescuento').textContent = '-'+Andina.formatBs(descuento);
+  }
+
+  const items = Carrito.obtener();
+  document.getElementById('resumenItems').innerHTML = items.map(i=>`
+    <div class="resumen-item-row">
+      <span>${i.nombre.substring(0,20)}... × ${i.cantidad}</span>
+      <strong>${Andina.formatBs(i.precio*i.cantidad)}</strong>
+    </div>`).join('');
+}
+
+function cambiarCant(id, delta) { Carrito.cambiarCantidad(id, delta); renderCarrito(); }
+function quitarItem(id) { Carrito.quitar(id); renderCarrito(); }
+
+function vaciarCarrito() {
+  Swal.fire({
+    title:'¿Vaciar carrito?', icon:'question',
+    showCancelButton:true, confirmButtonText:'Sí, vaciar', cancelButtonText:'Cancelar',
+    background:'#111827', color:'#e2e8f0',
+    confirmButtonColor:'#ef4444', cancelButtonColor:'#1e293b'
+  }).then(r=>{ if(r.isConfirmed){ Carrito.vaciar(); renderCarrito(); } });
+}
+
+const CUPONES = { ANDINA2026: 10, DESCUENTO15: 15, PROMO20: 20 };
+function aplicarCupon() {
+  const code = document.getElementById('cuponInput').value.trim().toUpperCase();
+  if(CUPONES[code]) {
+    descuentoPct = CUPONES[code];
+    Andina.showToast(`Cupón aplicado: ${descuentoPct}% de descuento`, 'success');
+    calcTotales();
+  } else {
+    Andina.showToast('Cupón inválido o expirado', 'error');
+  }
+}
+
+async function confirmarPedido() {
+  const items = Carrito.obtener();
+  if(!items.length){ Andina.showToast('Tu carrito está vacío','warning'); return; }
+  const sub = Carrito.subtotal();
+  const total = sub * 1.13 * (1 - descuentoPct/100);
+  const r = await Swal.fire({
+    title:'¿Confirmar pedido?',
+    html:`<div class="text-center"><div style="font-size:28px;font-weight:700;color:#38ef7d;font-family:'Space Grotesk',sans-serif;">${Andina.formatBs(total)}</div><p style="font-size:13px;color:#64748b;">${items.length} producto(s) · Entrega estimada: 2-3 días hábiles</p></div>`,
+    icon:'question', showCancelButton:true,
+    confirmButtonText:'<i class="bi bi-check-circle me-1"></i>Confirmar',
+    cancelButtonText:'Revisar',
+    background:'#111827', color:'#e2e8f0',
+    confirmButtonColor:'#00a859', cancelButtonColor:'#1e293b'
+  });
+  if(!r.isConfirmed) return;
+  await Andina.apiRequest('crear_pedido_cliente',{items, total});
+  Carrito.vaciar();
+  await Swal.fire({
+    title:'¡Pedido confirmado!',
+    html:'<p style="color:#64748b;">Tu pedido fue registrado. Te contactaremos pronto para coordinar la entrega.</p>',
+    icon:'success', confirmButtonText:'Ver mis pedidos',
+    background:'#111827', color:'#e2e8f0', confirmButtonColor:'#00a859'
+  });
+  window.location.href = 'mis_pedidos.html';
+}
+
+renderCarrito();
+</script>
+<script src="../assets/js/transitions.js"></script>
+</body>
+</html>

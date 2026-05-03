@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0f1e">
+  <style>html{background:#0a0f1e}</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proveedores — Distribuidora Andina SRL</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <link href="../assets/css/custom.css" rel="stylesheet">
+</head>
+<body>
+<div id="sidebar"></div>
+<div id="navbar"></div>
+<div id="main-content">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1 class="page-title"><i class="bi bi-truck me-2"></i>Proveedores</h1>
+      <p class="page-subtitle">Directorio de proveedores y partners comerciales</p>
+    </div>
+    <button class="btn btn-primary" onclick="abrirModal()"><i class="bi bi-plus-lg me-1"></i>Nuevo Proveedor</button>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="stat-card"><div class="stat-icon primary"><i class="bi bi-truck"></i></div><div class="stat-info"><div class="stat-number">4</div><div class="stat-label">Proveedores activos</div></div></div></div>
+    <div class="col-md-3"><div class="stat-card"><div class="stat-icon success"><i class="bi bi-patch-check"></i></div><div class="stat-info"><div class="stat-number">4</div><div class="stat-label">Certificados</div></div></div></div>
+    <div class="col-md-3"><div class="stat-card"><div class="stat-icon warning"><i class="bi bi-geo-alt"></i></div><div class="stat-info"><div class="stat-number">3</div><div class="stat-label">Ciudades</div></div></div></div>
+    <div class="col-md-3"><div class="stat-card"><div class="stat-icon accent"><i class="bi bi-cart3"></i></div><div class="stat-info"><div class="stat-number">4</div><div class="stat-label">Órdenes activas</div></div></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table id="tablaProveedores" class="table table-striped mb-0 w-100">
+          <thead><tr><th>Razón social</th><th>NIT</th><th>Contacto</th><th>Teléfono</th><th>Email</th><th>Ciudad</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="tbodyProveedores"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="page-footer"><span>© 2026 Distribuidora Andina SRL</span></footer>
+
+<!-- Modal -->
+<div class="modal fade" id="modalProv" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="modalTitle">Nuevo Proveedor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-8"><label class="form-label">Razón social *</label><input type="text" class="form-control" id="pNombre"></div>
+          <div class="col-md-4"><label class="form-label">NIT *</label><input type="text" class="form-control" id="pNit"></div>
+          <div class="col-md-6"><label class="form-label">Persona de contacto</label><input type="text" class="form-control" id="pContacto"></div>
+          <div class="col-md-6"><label class="form-label">Teléfono</label><input type="text" class="form-control" id="pTel"></div>
+          <div class="col-md-6"><label class="form-label">Email</label><input type="email" class="form-control" id="pEmail"></div>
+          <div class="col-md-6"><label class="form-label">Ciudad</label><select class="form-select" id="pCiudad"><option>Santa Cruz</option><option>La Paz</option><option>Cochabamba</option><option>Oruro</option><option>Potosí</option></select></div>
+          <div class="col-12"><label class="form-label">Dirección</label><input type="text" class="form-control" id="pDir"></div>
+          <div class="col-md-6"><label class="form-label">Condición de pago habitual</label><select class="form-select" id="pCondPago"><option>Contado</option><option>30 días</option><option>60 días</option><option>90 días</option></select></div>
+          <div class="col-md-6 d-flex align-items-end"><div class="form-check form-switch ms-2"><input class="form-check-input" type="checkbox" id="pActivo" checked><label class="form-check-label" for="pActivo">Proveedor activo</label></div></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="guardarProveedor()"><i class="bi bi-save me-1"></i>Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="../assets/js/app.js"></script>
+<script>
+const session = Andina.initPage({ activeKey:'proveedores', pageTitle:'Proveedores' });
+if(!session) throw new Error('no session');
+
+let proveedores = [...Andina.MOCK_DATA.proveedores];
+let editId = null;
+
+function renderProveedores() {
+  document.getElementById('tbodyProveedores').innerHTML = proveedores.map(p=>{
+    const init = p.razon_social.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+    return `<tr>
+      <td><div class="d-flex align-items-center gap-2"><div style="width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--secondary),#c3d4f0);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:var(--primary);">${init}</div><strong style="font-size:13px;">${p.razon_social}</strong></div></td>
+      <td><code style="font-size:12px;">${p.nit}</code></td>
+      <td>${p.contacto}</td>
+      <td><a href="tel:${p.telefono}" style="color:var(--primary);text-decoration:none;"><i class="bi bi-telephone me-1"></i>${p.telefono}</a></td>
+      <td>${p.email}</td>
+      <td><i class="bi bi-geo-alt me-1 text-muted"></i>${p.ciudad}</td>
+      <td>${Andina.getBadgeEstado(p.estado)}</td>
+      <td><div class="d-flex gap-1">
+        <button class="btn btn-outline-primary btn-xs" onclick="editarProv(${p.id})"><i class="bi bi-pencil"></i></button>
+        <a href="../compras/crear.html?proveedor=${p.id}" class="btn btn-outline-success btn-xs" title="Nueva orden"><i class="bi bi-cart-plus"></i></a>
+        <button class="btn btn-outline-danger btn-xs" onclick="eliminarProv(${p.id},'${p.razon_social}')" data-role-admin><i class="bi bi-trash3"></i></button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  if($.fn.DataTable.isDataTable('#tablaProveedores')) $('#tablaProveedores').DataTable().destroy();
+  $('#tablaProveedores').DataTable({ language:{url:'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json'}, order:[[0,'asc']], pageLength:10 });
+  Andina.applyRolePermissions();
+}
+
+renderProveedores();
+
+function abrirModal(id=null) {
+  editId=id;
+  document.getElementById('modalTitle').textContent = id?'Editar Proveedor':'Nuevo Proveedor';
+  ['pNombre','pNit','pContacto','pTel','pEmail','pDir'].forEach(f=>document.getElementById(f).value='');
+  document.getElementById('pActivo').checked=true;
+  if(id){ const p=proveedores.find(x=>x.id===id); if(p){ document.getElementById('pNombre').value=p.razon_social; document.getElementById('pNit').value=p.nit; document.getElementById('pContacto').value=p.contacto; document.getElementById('pTel').value=p.telefono; document.getElementById('pEmail').value=p.email; document.getElementById('pCiudad').value=p.ciudad; } }
+  new bootstrap.Modal(document.getElementById('modalProv')).show();
+}
+
+function editarProv(id){ abrirModal(id); }
+
+async function guardarProveedor(){
+  const nombre=document.getElementById('pNombre').value.trim();
+  if(!nombre){ Andina.showToast('La razón social es requerida','warning'); return; }
+  await Andina.apiRequest(editId?'editar_proveedor':'crear_proveedor',{razon_social:nombre,nit:document.getElementById('pNit').value,contacto:document.getElementById('pContacto').value,telefono:document.getElementById('pTel').value,email:document.getElementById('pEmail').value,ciudad:document.getElementById('pCiudad').value,id:editId});
+  bootstrap.Modal.getInstance(document.getElementById('modalProv')).hide();
+  if(!editId) proveedores.push({id:Date.now(),razon_social:nombre,nit:document.getElementById('pNit').value,contacto:document.getElementById('pContacto').value,telefono:document.getElementById('pTel').value,email:document.getElementById('pEmail').value,ciudad:document.getElementById('pCiudad').value,estado:'Activo'});
+  Andina.showToast(editId?'Proveedor actualizado':'Proveedor creado','success');
+  renderProveedores();
+}
+
+function eliminarProv(id,nombre){
+  Swal.fire({title:'¿Eliminar proveedor?',html:`<strong>${nombre}</strong>`,icon:'warning',showCancelButton:true,confirmButtonText:'Sí, eliminar',cancelButtonText:'Cancelar',confirmButtonColor:'#dc3545'}).then(async r=>{if(r.isConfirmed){await Andina.apiRequest('eliminar_proveedor',{id});proveedores=proveedores.filter(p=>p.id!==id);Andina.showToast('Proveedor eliminado','success');renderProveedores();}});
+}
+</script>
+<script src="../assets/js/transitions.js"></script>
+</body>
+</html>
