@@ -39,7 +39,7 @@ function responderJSON($data, $codigo = 200) {
 
 function verificarAutenticacion() {
     if (!isset($_SESSION['id_usuario'])) {
-        responderJSON(["error" => "No autorizado. Inicie sesión."], 401);
+        responderJSON(["error" => "No autorizado. Inicie sesi?n."], 401);
     }
 }
 
@@ -59,7 +59,7 @@ function generarCSRF() {
 
 function verificarCSRF($token) {
     if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
-        responderJSON(["error" => "Token CSRF inválido"], 403);
+        responderJSON(["error" => "Token CSRF inv?lido"], 403);
     }
 }
 
@@ -71,8 +71,8 @@ function enviarCorreoOTP($email, $codigo_otp) {
     $phpmailer_path = __DIR__ . '/../vendor/autoload.php';
     
     if (!file_exists($phpmailer_path)) {
-        error_log("OTP para {$email}: {$codigo_otp}");
-        return true;
+        error_log("PHPMailer no instalado. OTP para {$email}: {$codigo_otp}");
+        return false;
     }
     
     require_once $phpmailer_path;
@@ -80,7 +80,7 @@ function enviarCorreoOTP($email, $codigo_otp) {
     $mail = new PHPMailer(true);
     
     try {
-        // Cargar configuración de variables de entorno
+        // Cargar configuraci?n de variables de entorno
         $mail_host = getEnv('MAIL_HOST', 'smtp.gmail.com');
         $mail_port = getEnv('MAIL_PORT', '587');
         $mail_username = getEnv('MAIL_USERNAME');
@@ -90,17 +90,21 @@ function enviarCorreoOTP($email, $codigo_otp) {
 
         if (empty($mail_username) || empty($mail_password)) {
             error_log("Variables de correo no configuradas. OTP para {$email}: {$codigo_otp}");
-            return true;
+            return false;
         }
 
-        // Configuración del servidor SMTP
+        if (empty(trim((string) $mail_from))) {
+            $mail_from = $mail_username;
+        }
+
+        // Configuraci?n del servidor SMTP
         $mail->isSMTP();
         $mail->Host       = $mail_host;
         $mail->SMTPAuth   = true;
         $mail->Username   = $mail_username;
         $mail->Password   = $mail_password;
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = $mail_port;
+        $mail->Port       = (int) $mail_port;
         $mail->CharSet    = 'UTF-8';
 
         // Remitente y destinatario
@@ -109,20 +113,20 @@ function enviarCorreoOTP($email, $codigo_otp) {
 
         // Contenido del correo
         $mail->isHTML(true);
-        $mail->Subject = 'Código de Verificación - Distribuidora Andina';
+        $mail->Subject = 'C?digo de Verificaci?n - Distribuidora Andina';
         $mail->Body    = "
             <div style='font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;'>
                 <h2 style='color: #0d6efd; text-align: center;'>Distribuidora Andina</h2>
                 <p style='font-size: 16px;'>Hola,</p>
-                <p style='font-size: 16px;'>Tu código de verificación es:</p>
+                <p style='font-size: 16px;'>Tu c?digo de verificaci?n es:</p>
                 <div style='background-color: #f8f9fa; padding: 20px; text-align: center; border-radius: 5px; margin: 20px 0;'>
                     <span style='font-size: 32px; font-weight: bold; letter-spacing: 10px; color: #0d6efd;'>{$codigo_otp}</span>
                 </div>
-                <p style='font-size: 14px; color: #666;'>Este código expira en <strong>10 minutos</strong>.</p>
-                <p style='font-size: 14px; color: #666;'>Si no solicitaste este código, ignora este mensaje.</p>
+                <p style='font-size: 14px; color: #666;'>Este c?digo expira en <strong>10 minutos</strong>.</p>
+                <p style='font-size: 14px; color: #666;'>Si no solicitaste este c?digo, ignora este mensaje.</p>
             </div>
         ";
-        $mail->AltBody = "Tu código de verificación es: {$codigo_otp}. Expira en 10 minutos.";
+        $mail->AltBody = "Tu c?digo de verificaci?n es: {$codigo_otp}. Expira en 10 minutos.";
 
         $mail->send();
         error_log("OTP enviado a {$email}");
@@ -130,12 +134,12 @@ function enviarCorreoOTP($email, $codigo_otp) {
         
     } catch (PHPMailerException $e) {
         error_log("Error al enviar correo: " . $mail->ErrorInfo);
-        error_log("OTP para {$email}: {$codigo_otp}");
-        return true; // Retornamos true para que el flujo continúe
+        error_log("OTP (fallback log) para {$email}: {$codigo_otp}");
+        return false;
     }
 }
 
-/** Alias usado por backend/test_api.php */
+/** Alias usado por backend/test_api.php ? devuelve true si el correo sali? por SMTP */
 function enviarOTP($email, $codigo_otp) {
     return enviarCorreoOTP($email, $codigo_otp);
 }

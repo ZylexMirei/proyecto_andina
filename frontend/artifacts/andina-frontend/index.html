@@ -383,6 +383,15 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 
   let session=null;
   const res = await Andina.apiRequest('login',{username,password});
+  if(res._offline){
+    errEl.textContent='No hay conexión con la API PHP. Arranca el backend (php -S 127.0.0.1:8080 apuntando a la carpeta del proyecto) y el frontend con npm run dev.';
+    errEl.style.display='block';
+    document.getElementById('btnText').style.display='';
+    document.getElementById('btnLoad').style.display='none';
+    document.getElementById('loginBtn').disabled=false;
+    return;
+  }
+  if(res.error && !res.exito){ errEl.textContent=res.error; errEl.style.display='block'; document.getElementById('btnText').style.display=''; document.getElementById('btnLoad').style.display='none'; document.getElementById('loginBtn').disabled=false; return; }
   if(res.exito){ session = res.datos||res.data; }
   else { const found=DEMO_USERS.find(u=>u.username===username&&u.password===password); if(found) session=found; }
 

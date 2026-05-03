@@ -133,13 +133,22 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
   document.getElementById('regBtnLoad').classList.add('d-none');
   document.getElementById('regBtn').disabled=false;
 
-  if(res.exito||res._offline){
-    Andina.showToast('Cuenta creada. Revisa tu email para el código.','success');
+  if(res._offline){
+    errEl.textContent='No hay conexión con PHP. Abre otra terminal: php -S 127.0.0.1:8080 -t la carpeta del proyecto, y usa npm run dev para el front.';
+    errEl.classList.remove('d-none');
+    return;
+  }
+  if(res.exito){
+    if(res.id_usuario) localStorage.setItem('andina_otp_uid', String(res.id_usuario));
     localStorage.setItem('andina_otp_email',email);
     localStorage.setItem('andina_otp_nombre',nombre);
+    const hint = res.email_enviado===false && res.codigo_otp
+      ? ' Código (desarrollo): '+res.codigo_otp
+      : '';
+    Andina.showToast((res.mensaje||'Cuenta creada.')+hint,'success');
     setTimeout(()=>window.location.href='verificar.html',1200);
   } else {
-    errEl.textContent=res.mensaje||'Error al registrar. Intenta de nuevo.';
+    errEl.textContent=res.error||res.mensaje||'Error al registrar. Intenta de nuevo.';
     errEl.classList.remove('d-none');
   }
 });
