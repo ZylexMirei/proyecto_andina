@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0f1e">
+  <style>html{background:#0a0f1e}</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clientes — Distribuidora Andina SRL</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <link href="../assets/css/custom.css" rel="stylesheet">
+</head>
+<body>
+<div id="sidebar"></div>
+<div id="navbar"></div>
+<div id="main-content">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1 class="page-title"><i class="bi bi-people me-2"></i>Clientes</h1>
+      <p class="page-subtitle">Directorio de clientes registrados</p>
+    </div>
+    <button class="btn btn-primary" onclick="abrirModalCliente()">
+      <i class="bi bi-person-plus me-1"></i>Nuevo Cliente
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table id="tablaClientes" class="table table-striped mb-0 w-100">
+          <thead><tr>
+            <th>Razón social</th><th>NIT / CI</th><th>Contacto</th><th>Teléfono</th><th>Email</th><th>Estado</th><th>Acciones</th>
+          </tr></thead>
+          <tbody id="tbodyClientes"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="page-footer"><span>© 2026 Distribuidora Andina SRL</span></footer>
+
+<!-- Modal cliente -->
+<div class="modal fade" id="modalCliente" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="modalClienteTitle">Nuevo Cliente</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-8"><label class="form-label">Razón social / Nombre *</label><input type="text" class="form-control" id="cNombre" placeholder="Tienda o empresa"></div>
+          <div class="col-md-4"><label class="form-label">NIT / CI</label><input type="text" class="form-control" id="cNit" placeholder="12345678"></div>
+          <div class="col-md-6"><label class="form-label">Persona de contacto</label><input type="text" class="form-control" id="cContacto" placeholder="Nombre del responsable"></div>
+          <div class="col-md-6"><label class="form-label">Teléfono</label><input type="text" class="form-control" id="cTel" placeholder="7xxxxxxx"></div>
+          <div class="col-md-6"><label class="form-label">Email</label><input type="email" class="form-control" id="cEmail"></div>
+          <div class="col-md-6"><label class="form-label">Ciudad</label>
+            <select class="form-select" id="cCiudad">
+              <option>Santa Cruz</option><option>La Paz</option><option>Cochabamba</option><option>Oruro</option><option>Potosí</option><option>Sucre</option><option>Beni</option><option>Pando</option><option>Tarija</option>
+            </select>
+          </div>
+          <div class="col-12"><label class="form-label">Dirección</label><input type="text" class="form-control" id="cDir" placeholder="Av. o calle, número, barrio"></div>
+          <div class="col-md-6"><label class="form-label">Límite de crédito (Bs.)</label><div class="input-group"><span class="input-group-text">Bs.</span><input type="number" class="form-control" id="cCredito" value="5000"></div></div>
+          <div class="col-md-6 d-flex align-items-end"><div class="form-check form-switch ms-2"><input class="form-check-input" type="checkbox" id="cActivo" checked><label class="form-check-label" for="cActivo">Cliente activo</label></div></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="guardarCliente()"><i class="bi bi-save me-1"></i>Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="../assets/js/app.js"></script>
+<script>
+const session = Andina.initPage({ activeKey:'clientes', pageTitle:'Clientes' });
+if(!session) throw new Error('no session');
+
+let editandoId = null;
+let clientes = [...Andina.MOCK_DATA.clientes];
+
+function renderClientes() {
+  const tbody = document.getElementById('tbodyClientes');
+  tbody.innerHTML = clientes.map(c => {
+    const initials = c.razon_social.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+    const acciones = `<div class="d-flex gap-1">
+      <button class="btn btn-outline-primary btn-xs" onclick="editarCliente(${c.id})" title="Editar" data-role-manager><i class="bi bi-pencil"></i></button>
+      <a href="../pedidos/crear.html?cliente=${c.id}" class="btn btn-outline-success btn-xs" title="Nuevo pedido"><i class="bi bi-receipt"></i></a>
+      <button class="btn btn-outline-danger btn-xs" onclick="eliminarCliente(${c.id},'${c.razon_social}')" data-role-admin><i class="bi bi-trash3"></i></button>
+    </div>`;
+    return `<tr>
+      <td><div class="d-flex align-items-center gap-2">
+        <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--secondary),#c3d4f0);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--primary);flex-shrink:0;">${initials}</div>
+        <strong style="font-size:13px;">${c.razon_social}</strong>
+      </div></td>
+      <td><code style="font-size:12px;">${c.nit_ci}</code></td>
+      <td>${c.contacto}</td>
+      <td><a href="tel:${c.telefono}" style="color:var(--primary);text-decoration:none;"><i class="bi bi-telephone me-1"></i>${c.telefono}</a></td>
+      <td><a href="mailto:${c.email}" style="color:var(--primary);text-decoration:none;">${c.email}</a></td>
+      <td>${Andina.getBadgeEstado(c.estado)}</td>
+      <td>${acciones}</td>
+    </tr>`;
+  }).join('');
+
+  if($.fn.DataTable.isDataTable('#tablaClientes')) $('#tablaClientes').DataTable().destroy();
+  $('#tablaClientes').DataTable({ language:{url:'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json'}, order:[[0,'asc']], pageLength:10 });
+  Andina.applyRolePermissions();
+}
+
+renderClientes();
+
+function abrirModalCliente(id=null) {
+  editandoId = id;
+  document.getElementById('modalClienteTitle').textContent = id ? 'Editar Cliente' : 'Nuevo Cliente';
+  ['cNombre','cNit','cContacto','cTel','cEmail','cDir'].forEach(f => document.getElementById(f).value = '');
+  document.getElementById('cCredito').value = '5000';
+  document.getElementById('cActivo').checked = true;
+  if(id) {
+    const c = clientes.find(x=>x.id===id);
+    if(c){
+      document.getElementById('cNombre').value=c.razon_social;
+      document.getElementById('cNit').value=c.nit_ci;
+      document.getElementById('cContacto').value=c.contacto;
+      document.getElementById('cTel').value=c.telefono;
+      document.getElementById('cEmail').value=c.email;
+      document.getElementById('cDir').value=c.direccion||'';
+    }
+  }
+  new bootstrap.Modal(document.getElementById('modalCliente')).show();
+}
+
+function editarCliente(id) { abrirModalCliente(id); }
+
+async function guardarCliente() {
+  const nombre = document.getElementById('cNombre').value.trim();
+  if(!nombre){ Andina.showToast('La razón social es requerida','warning'); return; }
+  await Andina.apiRequest(editandoId?'editar_cliente':'crear_cliente',{ razon_social:nombre, nit_ci:document.getElementById('cNit').value, contacto:document.getElementById('cContacto').value, telefono:document.getElementById('cTel').value, email:document.getElementById('cEmail').value, direccion:document.getElementById('cDir').value, id:editandoId });
+  bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();
+  if(!editandoId) {
+    clientes.push({ id:Date.now(), razon_social:nombre, nit_ci:document.getElementById('cNit').value, contacto:document.getElementById('cContacto').value, telefono:document.getElementById('cTel').value, email:document.getElementById('cEmail').value, direccion:document.getElementById('cDir').value, estado:'Activo' });
+  }
+  Andina.showToast(editandoId?'Cliente actualizado':'Cliente creado correctamente','success');
+  renderClientes();
+}
+
+function eliminarCliente(id, nombre) {
+  Swal.fire({ title:'¿Eliminar cliente?', html:`<strong>${nombre}</strong> será eliminado del sistema.`, icon:'warning', showCancelButton:true, confirmButtonText:'Sí, eliminar', cancelButtonText:'Cancelar', confirmButtonColor:'#dc3545' }).then(async r=>{
+    if(r.isConfirmed){ await Andina.apiRequest('eliminar_cliente',{id}); clientes=clientes.filter(c=>c.id!==id); Andina.showToast('Cliente eliminado','success'); renderClientes(); }
+  });
+}
+</script>
+<script src="../assets/js/transitions.js"></script>
+</body>
+</html>

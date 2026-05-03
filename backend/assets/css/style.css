@@ -1,0 +1,124 @@
+/* assets/css/style.css */
+:root {
+    --primary-color: #0d6efd;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #f8f9fa;
+}
+
+main {
+    flex: 1;
+}
+
+.footer {
+    margin-top: auto;
+}
+
+/* Estilos para el catálogo de productos */
+.card-producto {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.card-producto:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.card-producto .card-img-top {
+    height: 200px;
+    object-fit: cover;
+}
+
+/* Estilos para el stock */
+.stock-normal {
+    color: var(--success-color);
+    font-weight: bold;
+}
+
+.stock-alerta {
+    color: var(--warning-color);
+    font-weight: bold;
+}
+
+.stock-critico {
+    color: var(--danger-color);
+    font-weight: bold;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    50% { opacity: 0.5; }
+}
+
+/* Estilos para el dashboard */
+.stat-card {
+    border-radius: 10px;
+    padding: 20px;
+    color: white;
+    transition: transform 0.2s;
+}
+
+.stat-card:hover {
+    transform: scale(1.05);
+}
+
+.stat-card-primary { background: linear-gradient(135deg, #0d6efd, #0a58ca); }
+.stat-card-success { background: linear-gradient(135deg, #28a745, #1e7e34); }
+.stat-card-warning { background: linear-gradient(135deg, #ffc107, #d39e00); }
+.stat-card-danger { background: linear-gradient(135deg, #dc3545, #b02a37); }
+
+/* Recomendaciones tipo globito */
+.recomendacion-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--warning-color);
+    color: #000;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    z-index: 10;
+}
+
+/* Tooltip personalizado */
+.tooltip-recomendacion {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip-recomendacion .tooltiptext {
+    visibility: hidden;
+    width: 250px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 10px;
+    position: absolute;
+    z-index: 100;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -125px;
+}
+
+.tooltip-recomendacion:hover .tooltiptext {
+    visibility: visible;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .stat-card {
+        margin-bottom: 15px;
+    }
+}
