@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#050d1f">
+  <style>html{background:#050d1f}</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar Sesión — Distribuidora Andina SRL</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="assets/css/custom.css" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;}
+    html,body{height:100%;margin:0;padding:0;font-family:'Space Grotesk','Inter',sans-serif;overflow:hidden;}
+
+    /* ── CANVAS DE FONDO ── */
+    #bgCanvas{
+      position:fixed;inset:0;width:100%;height:100%;z-index:0;
+      background:#050d1f;
+    }
+
+    /* ── GRID OVERLAY ── */
+    .bg-grid{
+      position:fixed;inset:0;z-index:1;pointer-events:none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+      background-size:48px 48px;
+    }
+
+    /* ── LAYOUT ROOT ── */
+    .login-root{
+      position:relative;z-index:2;
+      min-height:100vh;
+      display:flex;
+    }
+
+    /* ── LEFT PANEL ── */
+    .login-left{
+      flex:1 1 55%;
+      display:flex;flex-direction:column;
+      padding:52px 64px;
+      position:relative;
+    }
+
+    /* brand top-left */
+    .login-brand{display:flex;align-items:center;gap:14px;}
+    .login-brand-logo{
+      width:46px;height:46px;
+      position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    }
+    .login-brand-logo::before{
+      content:'';position:absolute;inset:0;border-radius:13px;
+      background:linear-gradient(#050d1f,#050d1f) padding-box,
+                linear-gradient(135deg,#00c6ff,#38ef7d) border-box;
+      border:2px solid transparent;
+      box-shadow:0 0 22px rgba(0,198,255,0.22);
+    }
+    .login-brand-logo-text{
+      position:relative;z-index:1;
+      font-weight:800;font-size:16px;letter-spacing:-0.5px;
+      background:linear-gradient(135deg,#00c6ff,#38ef7d);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .login-brand-name{font-weight:700;font-size:15px;color:#fff;line-height:1.2;letter-spacing:-0.2px;}
+    .login-brand-name .accent{
+      background:linear-gradient(135deg,#00c6ff,#38ef7d);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .login-brand-sub{font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.8px;text-transform:uppercase;margin-top:2px;}
+
+    /* headline — centered vertically */
+    .login-hero{
+      flex:1;display:flex;flex-direction:column;justify-content:center;
+      padding-bottom:40px;
+    }
+    .login-headline{
+      font-family:'Poppins',sans-serif;
+      font-weight:900;
+      font-size:clamp(52px,6.5vw,80px);
+      line-height:1.04;
+      color:#fff;
+      margin:0 0 22px;
+      letter-spacing:-2.5px;
+    }
+    .login-headline .dot{
+      background:linear-gradient(135deg,#00c6ff,#38ef7d);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .login-tagline{
+      font-size:15.5px;color:rgba(255,255,255,.45);
+      max-width:400px;line-height:1.75;margin:0;
+    }
+
+    /* ── RIGHT PANEL ── */
+    .login-right{
+      flex:0 0 min(460px,44%);
+      display:flex;align-items:center;justify-content:center;
+      padding:52px 44px;
+      background:rgba(10,15,30,0.6);
+      border-left:1px solid rgba(255,255,255,0.05);
+      backdrop-filter:blur(2px);
+      position:relative;
+    }
+    .login-right::before{
+      content:'';position:absolute;inset:0;pointer-events:none;
+      background:
+        radial-gradient(ellipse 90% 60% at 50% 0%,rgba(0,198,255,0.04) 0%,transparent 70%),
+        radial-gradient(ellipse 70% 40% at 50% 100%,rgba(56,239,125,0.03) 0%,transparent 70%);
+    }
+
+    /* CARD */
+    .login-card{
+      width:100%;max-width:370px;position:relative;z-index:1;
+    }
+
+    /* Logo inside card */
+    .card-brand{display:flex;align-items:center;gap:12px;margin-bottom:28px;}
+    .card-brand-logo{
+      width:42px;height:42px;
+      position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    }
+    .card-brand-logo::before{
+      content:'';position:absolute;inset:0;border-radius:12px;
+      background:linear-gradient(#0a0f1e,#0a0f1e) padding-box,
+                linear-gradient(135deg,#00c6ff,#38ef7d) border-box;
+      border:2px solid transparent;
+      box-shadow:0 0 18px rgba(0,198,255,0.2);
+    }
+    .card-brand-logo-text{
+      position:relative;z-index:1;font-weight:800;font-size:15px;
+      background:linear-gradient(135deg,#00c6ff,#38ef7d);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .card-brand-name{font-weight:700;font-size:14px;color:#fff;}
+    .card-brand-name .accent{
+      background:linear-gradient(135deg,#00c6ff,#38ef7d);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .card-brand-sub{font-size:9.5px;color:rgba(255,255,255,.28);letter-spacing:.7px;text-transform:uppercase;margin-top:1px;}
+
+    .card-divider{height:1px;background:rgba(255,255,255,0.06);margin-bottom:28px;}
+
+    .login-form-title{
+      font-weight:700;font-size:25px;color:#f1f5f9;margin:0 0 5px;letter-spacing:-0.5px;
+    }
+    .login-form-sub{font-size:13px;color:#475569;margin:0 0 30px;}
+
+    /* inputs */
+    .field-wrap{position:relative;margin-bottom:17px;}
+    .field-wrap label{
+      font-size:10.5px;font-weight:700;letter-spacing:.75px;text-transform:uppercase;
+      color:#475569;margin-bottom:8px;display:block;
+    }
+    .field-wrap input{
+      width:100%;border:1.5px solid rgba(255,255,255,0.08);border-radius:11px;
+      padding:12px 42px 12px 16px;font-size:14px;color:#e2e8f0;
+      background:rgba(255,255,255,0.04);outline:none;transition:all .2s ease;
+      font-family:'Space Grotesk',sans-serif;
+    }
+    .field-wrap input::placeholder{color:#2d3f5a;}
+    .field-wrap input:focus{
+      border-color:rgba(0,198,255,0.35);
+      background:rgba(0,198,255,0.04);
+      box-shadow:0 0 0 3px rgba(0,198,255,0.07);
+    }
+    .field-icon{position:absolute;right:14px;bottom:13px;color:#2d3f5a;cursor:pointer;font-size:16px;transition:color .2s;}
+    .field-icon:hover{color:#00c6ff;}
+
+    .field-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+    .forgot-link{font-size:12px;color:#00c6ff;text-decoration:none;font-weight:600;transition:color .2s;}
+    .forgot-link:hover{color:#38ef7d;}
+
+    .login-btn{
+      width:100%;padding:13px;border:none;border-radius:11px;
+      background:linear-gradient(135deg,#00c6ff,#0072ff);
+      color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;
+      cursor:pointer;transition:all .2s ease;letter-spacing:0.2px;
+      display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px;
+      box-shadow:0 4px 22px rgba(0,198,255,0.28);
+    }
+    .login-btn:hover{
+      transform:translateY(-2px);
+      box-shadow:0 8px 32px rgba(0,198,255,0.38);
+    }
+    .login-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none;}
+
+    #loginError{
+      font-size:12.5px;border-radius:9px;margin-bottom:14px;padding:10px 14px;
+      background:rgba(220,53,69,0.1);color:#f87171;
+      border:1px solid rgba(220,53,69,0.18);border-left:3px solid #ef4444;
+      display:none;
+    }
+
+    /* responsive */
+    @media(max-width:768px){
+      .login-left{display:none;}
+      .login-right{flex:1;padding:36px 24px;background:rgba(5,13,31,0.98);backdrop-filter:none;}
+      html,body{overflow:auto;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Animated background -->
+<canvas id="bgCanvas"></canvas>
+<div class="bg-grid"></div>
+
+<div class="login-root">
+
+  <!-- LEFT -->
+  <div class="login-left">
+    <div class="login-brand">
+      <div class="login-brand-logo"><span class="login-brand-logo-text">DA</span></div>
+      <div>
+        <div class="login-brand-name">Distribuidora <span class="accent">Andina</span></div>
+        <div class="login-brand-sub">SRL · Sistema de Gestión</div>
+      </div>
+    </div>
+
+    <div class="login-hero">
+      <h1 class="login-headline">Bienvenido<span class="dot">.</span></h1>
+      <p class="login-tagline">Gestiona tu cadena de suministro con precisión. Inventario, pedidos, clientes y reportes — todo en un solo lugar.</p>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="login-right">
+    <div class="login-card">
+
+      <!-- Brand inside card -->
+      <div class="card-brand">
+        <div class="card-brand-logo"><span class="card-brand-logo-text">DA</span></div>
+        <div>
+          <div class="card-brand-name">Distribuidora <span class="accent">Andina</span></div>
+          <div class="card-brand-sub">SRL · Sistema de Gestión</div>
+        </div>
+      </div>
+      <div class="card-divider"></div>
+
+      <h2 class="login-form-title">Iniciar sesión</h2>
+      <p class="login-form-sub">Ingresa tus credenciales para continuar</p>
+
+      <div id="loginError"></div>
+
+      <form id="loginForm" novalidate>
+        <div class="field-wrap">
+          <label for="username"><i class="bi bi-person me-1"></i>Usuario</label>
+          <input type="text" id="username" placeholder="Tu nombre de usuario" autocomplete="username">
+          <i class="bi bi-person field-icon"></i>
+        </div>
+        <div class="field-wrap" style="margin-bottom:22px;">
+          <div class="field-row">
+            <label for="password" style="margin-bottom:0;"><i class="bi bi-lock me-1"></i>Contraseña</label>
+            <a href="#" class="forgot-link" onclick="mostrarRecuperar(); return false;">¿Olvidaste?</a>
+          </div>
+          <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" style="margin-top:8px;">
+          <i class="bi bi-eye field-icon" id="eyeIcon" onclick="togglePass()"></i>
+        </div>
+
+        <button type="submit" class="login-btn" id="loginBtn">
+          <span id="btnText"><i class="bi bi-box-arrow-in-right"></i>&nbsp;Iniciar sesión</span>
+          <span id="btnLoad" style="display:none;"><span class="spinner-border spinner-border-sm" style="width:16px;height:16px;border-width:2px;"></span>&nbsp;Verificando...</span>
+        </button>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(function(){
+  const t = localStorage.getItem('andina_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  const s = Andina.getSession();
+  if(s){ window.location.href = s.rol==='Cliente' ? 'cliente/tienda.html' : 'dashboard.html'; }
+})();
+
+/* ── Animated canvas background ── */
+(function(){
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, orbs, particles;
+
+  function resize(){
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function initOrbs(){
+    orbs = [
+      { x: W*0.15, y: H*0.15, r: 320, color:[26,92,173],  dx:0.18, dy:0.10, phase:0     },
+      { x: W*0.75, y: H*0.80, r: 260, color:[0,168,89],   dx:-0.14,dy:-0.12,phase:2.1   },
+      { x: W*0.55, y: H*0.45, r: 200, color:[13,61,121],  dx:0.09, dy:0.16, phase:4.2   },
+      { x: W*0.85, y: H*0.20, r: 180, color:[0,198,255],  dx:-0.11,dy:0.13, phase:1.5   },
+      { x: W*0.20, y: H*0.75, r: 150, color:[56,239,125], dx:0.13, dy:-0.09,phase:3.3   },
+    ];
+  }
+
+  function initParticles(){
+    particles = Array.from({length:55}, ()=>({
+      x: Math.random()*W,
+      y: Math.random()*H,
+      r: Math.random()*1.2+0.3,
+      alpha: Math.random()*0.4+0.05,
+      dx: (Math.random()-0.5)*0.3,
+      dy: (Math.random()-0.5)*0.3,
+    }));
+  }
+
+  let t = 0;
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#050d1f';
+    ctx.fillRect(0,0,W,H);
+
+    /* orbs */
+    orbs.forEach(o=>{
+      const wave = Math.sin(t*0.008 + o.phase);
+      const ox = o.x + Math.cos(t*0.007 + o.phase) * 60;
+      const oy = o.y + wave * 45;
+      const grad = ctx.createRadialGradient(ox,oy,0,ox,oy,o.r);
+      grad.addColorStop(0, `rgba(${o.color.join(',')},0.18)`);
+      grad.addColorStop(0.5,`rgba(${o.color.join(',')},0.07)`);
+      grad.addColorStop(1, `rgba(${o.color.join(',')},0)`);
+      ctx.beginPath();
+      ctx.arc(ox,oy,o.r,0,Math.PI*2);
+      ctx.fillStyle=grad;
+      ctx.fill();
+    });
+
+    /* particles */
+    particles.forEach(p=>{
+      p.x += p.dx; p.y += p.dy;
+      if(p.x<0) p.x=W; if(p.x>W) p.x=0;
+      if(p.y<0) p.y=H; if(p.y>H) p.y=0;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(0,198,255,${p.alpha})`;
+      ctx.fill();
+    });
+
+    t++;
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  initOrbs();
+  initParticles();
+  draw();
+  window.addEventListener('resize',()=>{ resize(); initOrbs(); initParticles(); });
+})();
+
+function togglePass(){
+  const pw = document.getElementById('password');
+  const ic = document.getElementById('eyeIcon');
+  pw.type = pw.type==='password' ? 'text' : 'password';
+  ic.className = pw.type==='password' ? 'bi bi-eye field-icon' : 'bi bi-eye-slash field-icon';
+}
+
+const DEMO_USERS = [
+  {id_usuario:1,id_empleado:1,username:'admin',nombre:'Monse Salcedo',rol:'Administrador',email:'admin@andina.bo'},
+  {id_usuario:2,id_empleado:2,username:'gerente',nombre:'Carlos Rodríguez',rol:'Gerente',email:'gerente@andina.bo'},
+  {id_usuario:3,id_empleado:3,username:'empleado',nombre:'Ana Torres',rol:'Empleado',email:'empleado@andina.bo'},
+  {id_usuario:4,id_empleado:null,username:'cliente',nombre:'Tienda Demo',rol:'Cliente',email:'cliente@demo.com'},
+];
+
+document.getElementById('loginForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const errEl = document.getElementById('loginError');
+  if(!username||!password){ errEl.textContent='Completa todos los campos.'; errEl.style.display='block'; return; }
+  errEl.style.display='none';
+
+  document.getElementById('btnText').style.display='none';
+  document.getElementById('btnLoad').style.display='flex';
+  document.getElementById('loginBtn').disabled=true;
+
+  let session=null;
+  const res = await Andina.apiRequest('login',{username,password});
+  if(res.exito){ session = res.datos||res.data; }
+  else { const found=DEMO_USERS.find(u=>u.username===username&&u.password===password); if(found) session=found; }
+
+  document.getElementById('btnText').style.display='';
+  document.getElementById('btnLoad').style.display='none';
+  document.getElementById('loginBtn').disabled=false;
+
+  if(session){
+    Andina.setSession({id_usuario:session.id_usuario,id_empleado:session.id_empleado,username:session.username,nombre:session.nombre,rol:session.rol,email:session.email,token:session.token});
+    Andina.showToast('¡Bienvenido, '+session.nombre+'!','success');
+    setTimeout(()=>{ window.location.href = session.rol==='Cliente' ? 'cliente/tienda.html' : 'dashboard.html'; },600);
+  } else {
+    errEl.textContent='Usuario o contraseña incorrectos.';
+    errEl.style.display='block';
+    document.getElementById('password').value='';
+  }
+});
+
+function mostrarRecuperar(){
+  Swal.fire({title:'Recuperar contraseña',html:'<p style="font-size:13.5px;color:#718096">Ingresa tu correo para recibir el código de verificación.</p><input type="email" class="form-control mt-2" id="emailRec" placeholder="correo@ejemplo.com">',confirmButtonText:'Enviar código',cancelButtonText:'Cancelar',showCancelButton:true,preConfirm:()=>{const e=document.getElementById('emailRec').value;if(!e){Swal.showValidationMessage('Ingresa tu email');return false;}return e;}}).then(r=>{if(r.isConfirmed){Andina.showToast('Código enviado a '+r.value,'success');setTimeout(()=>window.location.href='verificar.html',1200);}});
+}
+</script>
+<script src="assets/js/transitions.js"></script>
+</body>
+</html>

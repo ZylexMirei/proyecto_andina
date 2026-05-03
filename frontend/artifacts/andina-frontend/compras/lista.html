@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0f1e">
+  <style>html{background:#0a0f1e}</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compras — Distribuidora Andina SRL</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <link href="../assets/css/custom.css" rel="stylesheet">
+</head>
+<body>
+<div id="sidebar"></div>
+<div id="navbar"></div>
+<div id="main-content">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1 class="page-title"><i class="bi bi-cart3 me-2"></i>Órdenes de Compra</h1>
+      <p class="page-subtitle">Gestión de compras a proveedores</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <select class="form-select" id="filtroEstado" style="width:150px;">
+        <option value="">Todos los estados</option>
+        <option>Pendiente</option><option>Aprobado</option><option>Recibido</option><option>Rechazado</option>
+      </select>
+      <select class="form-select" id="filtroProveedor" style="width:180px;">
+        <option value="">Todos los proveedores</option>
+        <option>PIL Andina SA</option><option>Nestlé Bolivia</option><option>Industrias Venado</option><option>Cocinero SA</option>
+      </select>
+      <a href="crear.html" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nueva Orden</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table id="tablaCompras" class="table table-striped mb-0 w-100">
+          <thead><tr>
+            <th>Código</th><th>Proveedor</th><th>Fecha</th><th>Estado</th><th>Total</th><th>Acciones</th>
+          </tr></thead>
+          <tbody id="tbodyCompras"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="page-footer"><span>© 2026 Distribuidora Andina SRL</span></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="../assets/js/app.js"></script>
+<script src="../assets/js/compras.js"></script>
+<script src="../assets/js/transitions.js"></script>
+</body>
+</html>

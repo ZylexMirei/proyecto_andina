@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0f1e">
+  <style>html{background:#0a0f1e}</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nueva Orden de Compra — Distribuidora Andina SRL</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="../assets/css/custom.css" rel="stylesheet">
+</head>
+<body>
+<div id="sidebar"></div>
+<div id="navbar"></div>
+<div id="main-content">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1 class="page-title"><i class="bi bi-cart-plus me-2"></i>Nueva Orden de Compra</h1>
+      <p class="page-subtitle">Completa todos los campos para crear la orden</p>
+    </div>
+    <a href="lista.html" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <!-- Sección 1: Proveedor -->
+      <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-truck me-2"></i>Datos del proveedor</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Proveedor *</label>
+              <select class="form-select" id="proveedor" required>
+                <option value="">Seleccionar proveedor...</option>
+                <option value="1">PIL Andina SA</option>
+                <option value="2">Nestlé Bolivia</option>
+                <option value="3">Industrias Venado</option>
+                <option value="4">Cocinero SA</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Fecha de la orden *</label>
+              <input type="date" class="form-control" id="fechaOrden" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Fecha esperada de entrega</label>
+              <input type="date" class="form-control" id="fechaEntrega">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Condición de pago</label>
+              <select class="form-select" id="condPago">
+                <option>Contado</option><option>30 días</option><option>60 días</option><option>90 días</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Observaciones</label>
+              <textarea class="form-control" id="observaciones" rows="2" placeholder="Instrucciones especiales, condiciones de entrega..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sección 2: Productos -->
+      <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-list-ul me-2"></i>Detalle de productos</span>
+          <button type="button" class="btn btn-success btn-sm" onclick="agregarFilaProducto()">
+            <i class="bi bi-plus me-1"></i>Agregar producto
+          </button>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table mb-0" id="tablaProductos">
+              <thead><tr>
+                <th style="width:40%">Producto</th><th>Cantidad</th><th>Precio unit.</th><th>Subtotal</th><th></th>
+              </tr></thead>
+              <tbody id="tbodyProductos"></tbody>
+              <tfoot>
+                <tr><td colspan="5" class="text-center py-3" id="emptyRow" style="color:#a0aec0;">
+                  <i class="bi bi-inbox me-2"></i>Agrega productos a la orden
+                </td></tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Totales -->
+    <div class="col-lg-4">
+      <div class="card sticky-top" style="top:80px;">
+        <div class="card-header"><i class="bi bi-calculator me-2"></i>Resumen de la orden</div>
+        <div class="card-body">
+          <div class="d-flex justify-content-between mb-2" style="font-size:13.5px;"><span>Subtotal</span><strong id="subtotalOC">Bs. 0.00</strong></div>
+          <div class="d-flex justify-content-between mb-2" style="font-size:13.5px;"><span>IVA (13%)</span><strong id="ivaOC">Bs. 0.00</strong></div>
+          <hr>
+          <div class="d-flex justify-content-between mb-3"><span class="fw-bold" style="font-size:15px;">Total</span><strong id="totalOC" style="font-size:18px;color:var(--accent);">Bs. 0.00</strong></div>
+          <div class="d-grid gap-2">
+            <button type="button" class="btn btn-primary" onclick="guardarOrden()">
+              <i class="bi bi-send me-2"></i>Crear orden
+            </button>
+            <a href="lista.html" class="btn btn-outline-secondary">Cancelar</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="page-footer"><span>© 2026 Distribuidora Andina SRL</span></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="../assets/js/app.js"></script>
+<script>
+const session = Andina.initPage({ activeKey:'compras', pageTitle:'Compras' });
+if(!session) throw new Error('no session');
+
+// Fecha hoy
+document.getElementById('fechaOrden').valueAsDate = new Date();
+const manana = new Date(); manana.setDate(manana.getDate()+7);
+document.getElementById('fechaEntrega').valueAsDate = manana;
+
+const productosOpts = Andina.MOCK_DATA.productos.map(p =>
+  `<option value="${p.id}" data-precio="${p.precio}">${p.codigo} — ${p.nombre}</option>`
+).join('');
+
+let filaCount = 0;
+
+function agregarFilaProducto() {
+  document.getElementById('emptyRow').style.display = 'none';
+  filaCount++;
+  const fila = document.createElement('tr');
+  fila.id = `fila${filaCount}`;
+  fila.innerHTML = `
+    <td><select class="form-select form-select-sm" onchange="actualizarFila(${filaCount})">
+      <option value="">Seleccionar...</option>${productosOpts}
+    </select></td>
+    <td><input type="number" class="form-control form-control-sm" value="1" min="1" style="width:80px;" onchange="actualizarFila(${filaCount})" id="cant${filaCount}"></td>
+    <td><div class="input-group input-group-sm" style="width:120px;"><span class="input-group-text">Bs.</span><input type="number" class="form-control" step="0.01" id="precio${filaCount}" onchange="actualizarFila(${filaCount})"></div></td>
+    <td><strong id="sub${filaCount}">Bs. 0.00</strong></td>
+    <td><button class="btn btn-outline-danger btn-xs" onclick="document.getElementById('fila${filaCount}').remove();calcTotales();"><i class="bi bi-trash3"></i></button></td>`;
+  document.getElementById('tbodyProductos').appendChild(fila);
+}
+
+function actualizarFila(id) {
+  const sel = document.querySelector(`#fila${id} select`);
+  const opt = sel.selectedOptions[0];
+  if(opt?.dataset?.precio) document.getElementById(`precio${id}`).value = opt.dataset.precio;
+  const cant = parseFloat(document.getElementById(`cant${id}`)?.value)||0;
+  const precio = parseFloat(document.getElementById(`precio${id}`)?.value)||0;
+  const sub = cant*precio;
+  document.getElementById(`sub${id}`).textContent = Andina.formatBs(sub);
+  calcTotales();
+}
+
+function calcTotales() {
+  let sub = 0;
+  document.querySelectorAll('#tbodyProductos tr').forEach(tr => {
+    const subEl = tr.querySelector('strong[id^="sub"]');
+    if(subEl) sub += parseFloat(subEl.textContent.replace('Bs. ','').replace(',',''))||0;
+  });
+  const iva = sub*0.13;
+  document.getElementById('subtotalOC').textContent = Andina.formatBs(sub);
+  document.getElementById('ivaOC').textContent = Andina.formatBs(iva);
+  document.getElementById('totalOC').textContent = Andina.formatBs(sub+iva);
+}
+
+async function guardarOrden() {
+  const prov = document.getElementById('proveedor').value;
+  if(!prov){ Andina.showToast('Selecciona un proveedor','warning'); return; }
+  const filas = document.querySelectorAll('#tbodyProductos tr');
+  if(filas.length===0){ Andina.showToast('Agrega al menos un producto','warning'); return; }
+  
+  const r = await Swal.fire({
+    title:'¿Crear orden de compra?',
+    text:'La orden quedará en estado Pendiente hasta ser aprobada.',
+    icon:'question', showCancelButton:true, confirmButtonText:'Sí, crear orden', cancelButtonText:'Cancelar'
+  });
+  if(!r.isConfirmed) return;
+  
+  await Andina.apiRequest('crear_orden_compra',{proveedor_id:prov});
+  Andina.showToast('Orden de compra creada correctamente','success');
+  setTimeout(()=>window.location.href='lista.html',900);
+}
+</script>
+<script src="../assets/js/transitions.js"></script>
+</body>
+</html>

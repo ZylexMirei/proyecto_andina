@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0f1e">
+  <style>html{background:#0a0f1e}</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro Empleado — Distribuidora Andina SRL</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="assets/css/custom.css" rel="stylesheet">
+  <style>
+    .auth-wrapper { background: linear-gradient(135deg, #0f2035 0%, #1a3a5c 55%, #0d6efd 100%); }
+    .auth-card { max-width: 480px; }
+    .pw-strength { height: 4px; border-radius: 2px; transition: all .3s; background: #edf2f7; margin-top: 6px; }
+    .pw-strength-bar { height: 100%; border-radius: 2px; width: 0; transition: all .3s; }
+    .strength-weak .pw-strength-bar { width: 33%; background: var(--danger); }
+    .strength-medium .pw-strength-bar { width: 66%; background: var(--warning); }
+    .strength-strong .pw-strength-bar { width: 100%; background: var(--success); }
+  </style>
+</head>
+<body>
+<div class="auth-wrapper" style="align-items:flex-start;padding-top:40px;padding-bottom:40px;">
+  <div class="auth-card">
+    <a href="index.html" class="d-flex align-items-center gap-2 mb-4 text-decoration-none" style="color:#718096;font-size:13px;">
+      <i class="bi bi-arrow-left"></i> Volver al inicio de sesión
+    </a>
+    <div class="auth-logo" style="width:52px;height:52px;font-size:20px;">DA</div>
+    <h1 class="auth-title mt-3">Crear cuenta de empleado</h1>
+    <p class="auth-subtitle">Distribuidora Andina SRL · Registro interno</p>
+
+    <form id="regForm" novalidate>
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">Nombre completo *</label>
+          <input type="text" class="form-control" id="nombre" placeholder="Ej: María García López" required>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Nombre de usuario *</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-at"></i></span>
+            <input type="text" class="form-control" id="username" placeholder="usuario_andina" required>
+          </div>
+          <div class="form-text">Sin espacios ni caracteres especiales.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Correo electrónico *</label>
+          <input type="email" class="form-control" id="email" placeholder="tu@andina.bo" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Contraseña *</label>
+          <div class="input-group">
+            <input type="password" class="form-control" id="password" placeholder="Mínimo 8 caracteres" required>
+            <button type="button" class="btn btn-outline-secondary" onclick="togglePw('password','eyePw')"><i class="bi bi-eye" id="eyePw"></i></button>
+          </div>
+          <div class="pw-strength" id="pwStrength"><div class="pw-strength-bar"></div></div>
+          <div class="form-text" id="pwMsg"></div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Confirmar contraseña *</label>
+          <div class="input-group">
+            <input type="password" class="form-control" id="confirm" placeholder="Repite la contraseña" required>
+            <button type="button" class="btn btn-outline-secondary" onclick="togglePw('confirm','eyeCf')"><i class="bi bi-eye" id="eyeCf"></i></button>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="terminos" required>
+            <label class="form-check-label" for="terminos" style="font-size:13px;">Acepto los <a href="#" class="text-primary">términos y condiciones</a> de la empresa</label>
+          </div>
+        </div>
+      </div>
+
+      <div id="regError" class="alert alert-danger d-none mt-3"></div>
+
+      <button type="submit" class="btn btn-primary w-100 py-2 mt-3" id="regBtn">
+        <span id="regBtnTxt"><i class="bi bi-person-check me-2"></i>Crear cuenta</span>
+        <span id="regBtnLoad" class="d-none"><span class="spinner-border spinner-border-sm me-2"></span>Registrando...</span>
+      </button>
+    </form>
+
+    <p class="text-center mt-3" style="font-size:13px;color:#718096;">¿Ya tienes cuenta? <a href="index.html" class="text-primary fw-semibold">Inicia sesión</a></p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+function togglePw(id,iconId){
+  const el=document.getElementById(id);const ic=document.getElementById(iconId);
+  el.type=el.type==='password'?'text':'password';
+  ic.className=el.type==='password'?'bi bi-eye':'bi bi-eye-slash';
+}
+
+document.getElementById('password').addEventListener('input',function(){
+  const v=this.value;
+  const str=document.getElementById('pwStrength');
+  const msg=document.getElementById('pwMsg');
+  str.className='pw-strength';
+  if(!v){msg.textContent='';return;}
+  let score=0;
+  if(v.length>=8)score++;if(/[A-Z]/.test(v))score++;if(/[0-9]/.test(v))score++;if(/[^A-Za-z0-9]/.test(v))score++;
+  if(score<=1){str.classList.add('strength-weak');msg.textContent='Contraseña débil';}
+  else if(score<=2){str.classList.add('strength-medium');msg.textContent='Contraseña media';}
+  else{str.classList.add('strength-strong');msg.textContent='Contraseña fuerte ✓';}
+});
+
+document.getElementById('regForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const nombre=document.getElementById('nombre').value.trim();
+  const username=document.getElementById('username').value.trim();
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  const confirm=document.getElementById('confirm').value;
+  const terminos=document.getElementById('terminos').checked;
+  const errEl=document.getElementById('regError');
+
+  if(!nombre||!username||!email||!password){errEl.textContent='Completa todos los campos requeridos.';errEl.classList.remove('d-none');return;}
+  if(password!==confirm){errEl.textContent='Las contraseñas no coinciden.';errEl.classList.remove('d-none');return;}
+  if(password.length<8){errEl.textContent='La contraseña debe tener al menos 8 caracteres.';errEl.classList.remove('d-none');return;}
+  if(!terminos){errEl.textContent='Debes aceptar los términos y condiciones.';errEl.classList.remove('d-none');return;}
+  errEl.classList.add('d-none');
+
+  document.getElementById('regBtnTxt').classList.add('d-none');
+  document.getElementById('regBtnLoad').classList.remove('d-none');
+  document.getElementById('regBtn').disabled=true;
+
+  const res=await Andina.apiRequest('registro',{nombre,username,email,password,id_rol:3});
+  
+  document.getElementById('regBtnTxt').classList.remove('d-none');
+  document.getElementById('regBtnLoad').classList.add('d-none');
+  document.getElementById('regBtn').disabled=false;
+
+  if(res.exito||res._offline){
+    Andina.showToast('Cuenta creada. Revisa tu email para el código.','success');
+    localStorage.setItem('andina_otp_email',email);
+    localStorage.setItem('andina_otp_nombre',nombre);
+    setTimeout(()=>window.location.href='verificar.html',1200);
+  } else {
+    errEl.textContent=res.mensaje||'Error al registrar. Intenta de nuevo.';
+    errEl.classList.remove('d-none');
+  }
+});
+</script>
+<script src="assets/js/transitions.js"></script>
+</body>
+</html>

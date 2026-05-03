@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0f1e">
+  <style>html{background:#0a0f1e}</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crear Pedido — Distribuidora Andina SRL</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="../assets/css/custom.css" rel="stylesheet">
+</head>
+<body>
+<div id="sidebar"></div>
+<div id="navbar"></div>
+<div id="main-content">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1 class="page-title"><i class="bi bi-cart-plus me-2"></i>Nuevo Pedido</h1>
+      <p class="page-subtitle">Crea un pedido para un cliente</p>
+    </div>
+    <a href="lista.html" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <!-- Sección 1: Cliente -->
+      <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-person me-2"></i>Datos del cliente</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label">Cliente *</label>
+              <div class="input-group">
+                <select class="form-select" id="cliente" required onchange="seleccionarCliente()">
+                  <option value="">Seleccionar cliente...</option>
+                </select>
+                <button type="button" class="btn btn-outline-primary" onclick="nuevoCliente()"><i class="bi bi-person-plus"></i></button>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Fecha del pedido</label>
+              <input type="date" class="form-control" id="fechaPedido">
+            </div>
+            <div id="infoCliente" class="col-12 d-none">
+              <div class="p-3 rounded-3" style="background:var(--secondary);">
+                <div class="row g-1">
+                  <div class="col-md-6"><i class="bi bi-telephone me-1 text-muted"></i><span id="clienteTel">—</span></div>
+                  <div class="col-md-6"><i class="bi bi-envelope me-1 text-muted"></i><span id="clienteEmail">—</span></div>
+                  <div class="col-12"><i class="bi bi-geo-alt me-1 text-muted"></i><span id="clienteDir">—</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sección 2: Productos -->
+      <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between">
+          <span><i class="bi bi-list-ul me-2"></i>Detalle de productos</span>
+          <button type="button" class="btn btn-success btn-sm" onclick="agregarProducto()">
+            <i class="bi bi-plus me-1"></i>Agregar producto
+          </button>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table mb-0">
+              <thead><tr><th style="width:40%">Producto</th><th>Stock disp.</th><th>Cantidad</th><th>Precio</th><th>Subtotal</th><th></th></tr></thead>
+              <tbody id="tbodyDetalles"></tbody>
+              <tfoot><tr><td colspan="6" class="text-center py-3" id="emptyRow" style="color:#a0aec0;"><i class="bi bi-inbox me-2"></i>Agrega productos al pedido</td></tr></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recomendaciones -->
+      <div id="seccionRec" class="card mb-4 d-none">
+        <div class="card-header" style="background:#fff8e1;color:#8a5e00;"><i class="bi bi-lightning-charge me-2"></i>¿También llevas esto?</div>
+        <div class="card-body">
+          <div class="row g-2" id="recsContainer"></div>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Observaciones del pedido</label>
+        <textarea class="form-control" id="observaciones" rows="2" placeholder="Instrucciones de entrega, notas especiales..."></textarea>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card sticky-top" style="top:80px;">
+        <div class="card-header"><i class="bi bi-calculator me-2"></i>Resumen del pedido</div>
+        <div class="card-body">
+          <div class="d-flex justify-content-between mb-2" style="font-size:13.5px;"><span>Subtotal</span><strong id="subtotal">Bs. 0.00</strong></div>
+          <div class="d-flex justify-content-between mb-2" style="font-size:13.5px;"><span>IVA (13%)</span><strong id="iva">Bs. 0.00</strong></div>
+          <hr>
+          <div class="d-flex justify-content-between mb-4"><span class="fw-bold" style="font-size:15px;">Total</span><strong id="total" style="font-size:18px;color:var(--accent);">Bs. 0.00</strong></div>
+          <div class="d-grid gap-2">
+            <button type="button" class="btn btn-primary btn-lg" onclick="confirmarPedido()">
+              <i class="bi bi-check-circle me-2"></i>Confirmar pedido
+            </button>
+            <a href="lista.html" class="btn btn-outline-secondary">Cancelar</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="page-footer"><span>© 2026 Distribuidora Andina SRL</span></footer>
+
+<!-- Modal nuevo cliente -->
+<div class="modal fade" id="modalCliente" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Nuevo Cliente</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12"><label class="form-label">Razón social *</label><input type="text" class="form-control" id="ncNombre" placeholder="Nombre o razón social"></div>
+          <div class="col-md-6"><label class="form-label">NIT / CI</label><input type="text" class="form-control" id="ncNit" placeholder="12345678"></div>
+          <div class="col-md-6"><label class="form-label">Teléfono</label><input type="text" class="form-control" id="ncTel" placeholder="7xxxxxxx"></div>
+          <div class="col-12"><label class="form-label">Email</label><input type="email" class="form-control" id="ncEmail"></div>
+          <div class="col-12"><label class="form-label">Dirección</label><input type="text" class="form-control" id="ncDir"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="guardarNuevoCliente()">Guardar cliente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="../assets/js/app.js"></script>
+<script>
+const session = Andina.initPage({ activeKey:'pedidos', pageTitle:'Pedidos' });
+if(!session) throw new Error('no session');
+
+document.getElementById('fechaPedido').valueAsDate = new Date();
+
+// Llenar select de clientes
+const selCliente = document.getElementById('cliente');
+Andina.MOCK_DATA.clientes.forEach(c => {
+  const opt = document.createElement('option');
+  opt.value = c.id;
+  opt.textContent = c.razon_social;
+  opt.dataset.tel = c.telefono; opt.dataset.email = c.email; opt.dataset.dir = c.direccion;
+  selCliente.appendChild(opt);
+});
+
+function seleccionarCliente() {
+  const opt = selCliente.selectedOptions[0];
+  if(!opt?.value){ document.getElementById('infoCliente').classList.add('d-none'); return; }
+  document.getElementById('clienteTel').textContent = opt.dataset.tel;
+  document.getElementById('clienteEmail').textContent = opt.dataset.email;
+  document.getElementById('clienteDir').textContent = opt.dataset.dir;
+  document.getElementById('infoCliente').classList.remove('d-none');
+}
+
+const productosOpts = Andina.MOCK_DATA.productos.map(p =>
+  `<option value="${p.id}" data-precio="${p.precio}" data-stock="${p.stock}">${p.codigo} — ${p.nombre}</option>`
+).join('');
+
+let rowCount = 0;
+const productosEnPedido = [];
+
+function agregarProducto() {
+  document.getElementById('emptyRow').style.display = 'none';
+  rowCount++;
+  const tr = document.createElement('tr');
+  tr.id = `row${rowCount}`;
+  tr.innerHTML = `
+    <td><select class="form-select form-select-sm" onchange="onProductoChange(${rowCount})">
+      <option value="">Seleccionar...</option>${productosOpts}
+    </select></td>
+    <td><span id="stock${rowCount}" style="font-size:12px;color:#718096;">—</span></td>
+    <td><input type="number" class="form-control form-control-sm" id="cant${rowCount}" value="1" min="1" style="width:70px;" onchange="calcFila(${rowCount})"></td>
+    <td><span id="precio${rowCount}" style="font-size:13px;font-weight:600;">Bs. 0.00</span></td>
+    <td><strong id="sub${rowCount}" style="color:var(--accent);">Bs. 0.00</strong></td>
+    <td><button class="btn btn-outline-danger btn-xs" onclick="quitarFila(${rowCount})"><i class="bi bi-trash3"></i></button></td>`;
+  document.getElementById('tbodyDetalles').appendChild(tr);
+}
+
+function onProductoChange(id) {
+  const sel = document.querySelector(`#row${id} select`);
+  const opt = sel.selectedOptions[0];
+  if(!opt?.value){ return; }
+  const precio = parseFloat(opt.dataset.precio)||0;
+  const stock = parseInt(opt.dataset.stock)||0;
+  document.getElementById(`stock${id}`).textContent = `${stock} disp.`;
+  document.getElementById(`precio${id}`).textContent = Andina.formatBs(precio);
+  document.getElementById(`cant${id}`).max = stock;
+  calcFila(id);
+  mostrarRecomendaciones(parseInt(opt.value));
+}
+
+function calcFila(id) {
+  const sel = document.querySelector(`#row${id} select`);
+  const opt = sel?.selectedOptions[0];
+  const precio = parseFloat(opt?.dataset?.precio)||0;
+  const cant = parseFloat(document.getElementById(`cant${id}`)?.value)||0;
+  const stock = parseInt(opt?.dataset?.stock)||0;
+  if(cant > stock && stock > 0) {
+    Andina.showToast('La cantidad supera el stock disponible','warning');
+    document.getElementById(`cant${id}`).value = stock;
+    return;
+  }
+  document.getElementById(`sub${id}`).textContent = Andina.formatBs(precio*cant);
+  calcTotales();
+}
+
+function quitarFila(id) {
+  document.getElementById(`row${id}`)?.remove();
+  calcTotales();
+}
+
+function calcTotales() {
+  let sub = 0;
+  document.querySelectorAll('#tbodyDetalles tr').forEach(tr => {
+    const el = tr.querySelector('strong[id^="sub"]');
+    if(el) sub += parseFloat(el.textContent.replace('Bs. ','').replace(',',''))||0;
+  });
+  const iva = sub*0.13;
+  document.getElementById('subtotal').textContent = Andina.formatBs(sub);
+  document.getElementById('iva').textContent = Andina.formatBs(iva);
+  document.getElementById('total').textContent = Andina.formatBs(sub+iva);
+}
+
+function mostrarRecomendaciones(prodId) {
+  const recs = Andina.MOCK_DATA.productos.filter(p => p.id !== prodId).slice(0,3);
+  if(!recs.length) return;
+  document.getElementById('seccionRec').classList.remove('d-none');
+  document.getElementById('recsContainer').innerHTML = recs.map(p => `
+    <div class="col-md-4">
+      <div class="d-flex align-items-center gap-2 p-2 rounded-3" style="background:#fff8e1;border:1px solid #ffc107;">
+        <i class="bi bi-lightning-charge text-warning"></i>
+        <div class="flex-1" style="min-width:0;">
+          <div style="font-size:12px;font-weight:600;color:#8a5e00;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.nombre}</div>
+          <div style="font-size:11px;color:#8a5e00;">${Andina.formatBs(p.precio)}</div>
+        </div>
+        <button class="btn btn-warning btn-xs" onclick="agregarProductoRec(${p.id})">+</button>
+      </div>
+    </div>`).join('');
+}
+
+function agregarProductoRec(prodId) {
+  agregarProducto();
+  const lastSel = document.querySelector(`#row${rowCount} select`);
+  lastSel.value = prodId;
+  onProductoChange(rowCount);
+}
+
+async function confirmarPedido() {
+  if(!document.getElementById('cliente').value){ Andina.showToast('Selecciona un cliente','warning'); return; }
+  const filas = document.querySelectorAll('#tbodyDetalles tr');
+  if(!filas.length){ Andina.showToast('Agrega al menos un producto','warning'); return; }
+  
+  const r = await Swal.fire({
+    title:'¿Confirmar pedido?', text:'El pedido será registrado y el stock descontado.',
+    icon:'question', showCancelButton:true, confirmButtonText:'Sí, confirmar', cancelButtonText:'Cancelar'
+  });
+  if(!r.isConfirmed) return;
+  
+  await Andina.apiRequest('crear_pedido',{ cliente_id: document.getElementById('cliente').value });
+  Andina.showToast('Pedido creado correctamente','success');
+  setTimeout(()=>window.location.href='lista.html',900);
+}
+
+function nuevoCliente() {
+  new bootstrap.Modal(document.getElementById('modalCliente')).show();
+}
+
+async function guardarNuevoCliente() {
+  const nombre = document.getElementById('ncNombre').value.trim();
+  if(!nombre){ Andina.showToast('El nombre es requerido','warning'); return; }
+  await Andina.apiRequest('crear_cliente',{ razon_social:nombre });
+  
+  // Añadir al select
+  const opt = document.createElement('option');
+  opt.value = Date.now(); opt.textContent = nombre;
+  opt.dataset.tel = document.getElementById('ncTel').value;
+  opt.dataset.email = document.getElementById('ncEmail').value;
+  opt.dataset.dir = document.getElementById('ncDir').value;
+  selCliente.appendChild(opt);
+  selCliente.value = opt.value;
+  seleccionarCliente();
+  
+  bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();
+  Andina.showToast('Cliente creado correctamente','success');
+}
+</script>
+<script src="../assets/js/transitions.js"></script>
+</body>
+</html>

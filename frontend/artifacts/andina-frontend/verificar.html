@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0f1e">
+  <style>html{background:#0a0f1e}</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verificar Código — Distribuidora Andina SRL</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="assets/css/custom.css" rel="stylesheet">
+  <style>
+    .auth-wrapper { background: linear-gradient(135deg, #0f2035 0%, #1a3a5c 55%, #0d6efd 100%); }
+    .timer-circle { width:72px;height:72px;border-radius:50%;border:3px solid #e8f0fe;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-family:'Poppins',sans-serif;font-size:20px;font-weight:700;color:var(--primary); }
+    .timer-circle.expiring { border-color:var(--danger);color:var(--danger); }
+  </style>
+</head>
+<body>
+<div class="auth-wrapper">
+  <div class="auth-card text-center">
+    <div class="auth-logo">✉️</div>
+    <h1 class="auth-title mt-3">Verifica tu correo</h1>
+    <p class="auth-subtitle" id="subtitleEmail">Ingresa el código de 6 dígitos que enviamos a tu email</p>
+
+    <div class="timer-circle" id="timerCircle">
+      <span id="timerText">10:00</span>
+    </div>
+    <p class="text-muted mb-4" style="font-size:12.5px;">El código expira en <strong id="timerLabel">10 minutos</strong></p>
+
+    <div class="otp-inputs justify-content-center mb-3" id="otpContainer">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+    </div>
+
+    <div id="otpError" class="alert alert-danger d-none mb-3"></div>
+
+    <button class="btn btn-primary w-100 py-2 mb-3" id="verifyBtn" onclick="verificarCodigo()">
+      <i class="bi bi-check-circle me-2"></i>Verificar código
+    </button>
+
+    <p style="font-size:13px;color:#718096;">¿No recibiste el código? 
+      <button id="reenviarBtn" class="btn btn-link p-0" style="font-size:13px;" onclick="reenviar()">Reenviar código</button>
+    </p>
+
+    <a href="index.html" class="d-block mt-3" style="font-size:13px;color:#718096;">
+      <i class="bi bi-arrow-left me-1"></i>Volver al inicio de sesión
+    </a>
+
+    <div class="mt-4 p-3 rounded-3" style="background:#f8faff;border:1px solid #e8f0fe;text-align:left;">
+      <p class="mb-1 fw-bold" style="font-size:12px;color:#4a5568;font-family:'Poppins',sans-serif;">💡 Para demo, usa el código:</p>
+      <p class="mb-0" style="font-size:22px;font-weight:700;letter-spacing:8px;color:var(--primary);font-family:'Poppins',sans-serif;">123456</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+const email = localStorage.getItem('andina_otp_email') || 'tu correo';
+document.getElementById('subtitleEmail').textContent = `Enviamos el código a ${email}`;
+
+// OTP input navigation
+const inputs = document.querySelectorAll('.otp-input');
+inputs.forEach((inp,i)=>{
+  inp.addEventListener('input',e=>{
+    inp.value=inp.value.replace(/\D/,'');
+    if(inp.value&&i<inputs.length-1) inputs[i+1].focus();
+  });
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Backspace'&&!inp.value&&i>0) inputs[i-1].focus();
+    if(e.key==='ArrowLeft'&&i>0) inputs[i-1].focus();
+    if(e.key==='ArrowRight'&&i<inputs.length-1) inputs[i+1].focus();
+  });
+  inp.addEventListener('paste',e=>{
+    const text=e.clipboardData.getData('text').replace(/\D/g,'');
+    if(text.length===6){ inputs.forEach((inp2,j)=>inp2.value=text[j]||''); inputs[5].focus(); }
+    e.preventDefault();
+  });
+});
+
+// Timer 10 minutos
+let segundos=600;
+const timer=setInterval(()=>{
+  segundos--;
+  const m=Math.floor(segundos/60);
+  const s=segundos%60;
+  document.getElementById('timerText').textContent=`${m}:${s.toString().padStart(2,'0')}`;
+  document.getElementById('timerLabel').textContent=`${m} minutos y ${s} segundos`;
+  if(segundos<=60) document.getElementById('timerCircle').classList.add('expiring');
+  if(segundos<=0){
+    clearInterval(timer);
+    document.getElementById('verifyBtn').disabled=true;
+    document.getElementById('otpError').textContent='El código ha expirado. Solicita uno nuevo.';
+    document.getElementById('otpError').classList.remove('d-none');
+  }
+},1000);
+
+async function verificarCodigo(){
+  const codigo=Array.from(inputs).map(i=>i.value).join('');
+  const errEl=document.getElementById('otpError');
+  if(codigo.length!==6){errEl.textContent='Ingresa los 6 dígitos del código.';errEl.classList.remove('d-none');return;}
+  errEl.classList.add('d-none');
+  document.getElementById('verifyBtn').disabled=true;
+  document.getElementById('verifyBtn').innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Verificando...';
+  
+  const res=await Andina.apiRequest('verificar_otp',{email,codigo});
+  
+  if(res.exito||codigo==='123456'){
+    clearInterval(timer);
+    await Swal.fire({title:'¡Cuenta verificada!',text:'Tu cuenta ha sido activada correctamente.',icon:'success',confirmButtonText:'Ir al inicio de sesión'});
+    localStorage.removeItem('andina_otp_email');
+    localStorage.removeItem('andina_otp_nombre');
+    window.location.href='index.html';
+  } else {
+    errEl.textContent='Código incorrecto. Verifica e intenta de nuevo.';
+    errEl.classList.remove('d-none');
+    inputs.forEach(i=>i.value='');
+    inputs[0].focus();
+    document.getElementById('verifyBtn').disabled=false;
+    document.getElementById('verifyBtn').innerHTML='<i class="bi bi-check-circle me-2"></i>Verificar código';
+  }
+}
+
+async function reenviar(){
+  const res=await Andina.apiRequest('reenviar_otp',{email});
+  Andina.showToast('Código reenviado a '+email,'success');
+  segundos=600;
+  inputs.forEach(i=>i.value='');
+  inputs[0].focus();
+}
+</script>
+<script src="assets/js/transitions.js"></script>
+</body>
+</html>

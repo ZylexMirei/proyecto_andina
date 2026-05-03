@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0f1e">
+  <style>html{background:#0a0f1e}</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crear Producto — Distribuidora Andina SRL</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="../assets/css/custom.css" rel="stylesheet">
+</head>
+<body>
+<div id="sidebar"></div>
+<div id="navbar"></div>
+<div id="main-content">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1 class="page-title" id="pageTitle"><i class="bi bi-plus-circle me-2"></i>Nuevo Producto</h1>
+      <p class="page-subtitle">Completa todos los campos requeridos</p>
+    </div>
+    <a href="lista.html" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+  </div>
+
+  <form id="formProducto" novalidate>
+    <div class="row g-4">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header"><i class="bi bi-info-circle me-2"></i>Información básica</div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">Código *</label>
+                <input type="text" class="form-control" id="codigo" placeholder="Ej: PIL-001" required>
+              </div>
+              <div class="col-md-8">
+                <label class="form-label">Nombre del producto *</label>
+                <input type="text" class="form-control" id="nombre" placeholder="Ej: Leche Entera PIL 1L" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Descripción</label>
+                <textarea class="form-control" id="descripcion" rows="3" placeholder="Descripción breve del producto, características principales..."></textarea>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Categoría *</label>
+                <select class="form-select" id="categoria" required>
+                  <option value="">Seleccionar...</option>
+                  <option>Lácteos</option><option>Bebidas</option><option>Granos</option>
+                  <option>Aceites</option><option>Dulces</option><option>Condimentos</option><option>Pastas</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Precio de venta (Bs.) *</label>
+                <div class="input-group">
+                  <span class="input-group-text">Bs.</span>
+                  <input type="number" class="form-control" id="precio" placeholder="0.00" step="0.01" min="0" required>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Precio de costo (Bs.)</label>
+                <div class="input-group">
+                  <span class="input-group-text">Bs.</span>
+                  <input type="number" class="form-control" id="costo" placeholder="0.00" step="0.01" min="0">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-4">
+          <div class="card-header"><i class="bi bi-boxes me-2"></i>Configuración de inventario</div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">Stock inicial</label>
+                <input type="number" class="form-control" id="stock" placeholder="0" min="0">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Stock mínimo *</label>
+                <input type="number" class="form-control" id="stock_min" placeholder="20" min="0" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Stock máximo</label>
+                <input type="number" class="form-control" id="stock_max" placeholder="500" min="0">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Unidad de medida</label>
+                <select class="form-select" id="unidad">
+                  <option>Unidad</option><option>Litro</option><option>Kilogramo</option>
+                  <option>Gramo</option><option>Caja</option><option>Docena</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Proveedor principal</label>
+                <select class="form-select" id="proveedor">
+                  <option value="">Sin proveedor asignado</option>
+                  <option value="1">PIL Andina SA</option>
+                  <option value="2">Nestlé Bolivia</option>
+                  <option value="3">Industrias Venado</option>
+                  <option value="4">Cocinero SA</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header"><i class="bi bi-image me-2"></i>Imagen del producto</div>
+          <div class="card-body text-center">
+            <div id="previewImg" style="width:100%;height:180px;background:#f0f4f8;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;overflow:hidden;border:2px dashed #e2e8f0;">
+              <div id="previewPlaceholder" style="color:#a0aec0;"><i class="bi bi-image" style="font-size:40px;"></i><p style="font-size:12px;margin-top:8px;">Sin imagen</p></div>
+              <img id="imgPreview" src="" alt="Preview" style="width:100%;height:100%;object-fit:cover;display:none;">
+            </div>
+            <label class="form-label">URL de imagen principal</label>
+            <input type="url" class="form-control" id="imagen" placeholder="https://..." id="imagenUrl">
+            <div class="form-text">Pega la URL de la imagen del producto.</div>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header"><i class="bi bi-toggle-on me-2"></i>Estado</div>
+          <div class="card-body">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="activo" checked>
+              <label class="form-check-label" for="activo">Producto activo</label>
+            </div>
+            <div class="form-text mt-1">Los productos inactivos no aparecen en pedidos ni tienda.</div>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header"><i class="bi bi-stars me-2"></i>Recomendaciones</div>
+          <div class="card-body">
+            <label class="form-label">Llévalo con...</label>
+            <select class="form-select" id="recomendado" multiple style="height:100px;">
+              <option value="1">Leche Entera PIL 1L</option>
+              <option value="2">Café Nescafé 200g</option>
+              <option value="3">Arroz Grano de Oro 1kg</option>
+              <option value="4">Aceite Cocinero 900ml</option>
+              <option value="5">Azúcar Blanca 1kg</option>
+            </select>
+            <div class="form-text">Ctrl+Click para seleccionar varios.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="formError" class="alert alert-danger d-none mt-3"></div>
+
+    <div class="d-flex gap-2 justify-content-end mt-4">
+      <a href="lista.html" class="btn btn-outline-secondary btn-lg"><i class="bi bi-x me-1"></i>Cancelar</a>
+      <button type="submit" class="btn btn-primary btn-lg" id="saveBtn">
+        <span id="saveTxt"><i class="bi bi-save me-2"></i>Guardar producto</span>
+        <span id="saveLoad" class="d-none"><span class="spinner-border spinner-border-sm me-2"></span>Guardando...</span>
+      </button>
+    </div>
+  </form>
+</div>
+
+<footer class="page-footer"><span>© 2026 Distribuidora Andina SRL</span></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="../assets/js/app.js"></script>
+<script>
+const session = Andina.initPage({ activeKey:'productos', pageTitle:'Productos' });
+if (!session) throw new Error('No session');
+
+// Preview imagen
+document.getElementById('imagen').addEventListener('input', function() {
+  const img = document.getElementById('imgPreview');
+  const ph = document.getElementById('previewPlaceholder');
+  if (this.value) {
+    img.src = this.value;
+    img.style.display = 'block';
+    ph.style.display = 'none';
+    img.onerror = () => { img.style.display='none'; ph.style.display='flex'; };
+  } else {
+    img.style.display = 'none';
+    ph.style.display = 'flex';
+  }
+});
+
+// Cargar datos si es edición
+const params = new URLSearchParams(location.search);
+const editId = params.get('id');
+if (editId) {
+  document.getElementById('pageTitle').innerHTML = '<i class="bi bi-pencil-square me-2"></i>Editar Producto';
+  const prod = Andina.MOCK_DATA.productos.find(p => p.id == editId);
+  if (prod) {
+    document.getElementById('codigo').value = prod.codigo;
+    document.getElementById('nombre').value = prod.nombre;
+    document.getElementById('descripcion').value = prod.descripcion || '';
+    document.getElementById('categoria').value = prod.categoria;
+    document.getElementById('precio').value = prod.precio;
+    document.getElementById('stock').value = prod.stock;
+    document.getElementById('stock_min').value = prod.stock_min;
+    document.getElementById('stock_max').value = prod.stock_max;
+    document.getElementById('imagen').value = prod.imagen || '';
+    if (prod.imagen) {
+      document.getElementById('imgPreview').src = prod.imagen;
+      document.getElementById('imgPreview').style.display = 'block';
+      document.getElementById('previewPlaceholder').style.display = 'none';
+    }
+  }
+}
+
+document.getElementById('formProducto').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const nombre = document.getElementById('nombre').value.trim();
+  const codigo = document.getElementById('codigo').value.trim();
+  const precio = document.getElementById('precio').value;
+  if (!nombre || !codigo || !precio) {
+    document.getElementById('formError').textContent = 'Completa los campos requeridos (*)';
+    document.getElementById('formError').classList.remove('d-none');
+    return;
+  }
+  document.getElementById('saveTxt').classList.add('d-none');
+  document.getElementById('saveLoad').classList.remove('d-none');
+  document.getElementById('saveBtn').disabled = true;
+
+  const data = {
+    codigo, nombre, descripcion: document.getElementById('descripcion').value,
+    categoria: document.getElementById('categoria').value,
+    precio: parseFloat(precio), stock: parseInt(document.getElementById('stock').value) || 0,
+    stock_min: parseInt(document.getElementById('stock_min').value) || 20,
+    stock_max: parseInt(document.getElementById('stock_max').value) || 500,
+    imagen: document.getElementById('imagen').value, activo: document.getElementById('activo').checked,
+    id: editId || null
+  };
+
+  const res = await Andina.apiRequest(editId ? 'editar_producto' : 'crear_producto', data);
+  document.getElementById('saveTxt').classList.remove('d-none');
+  document.getElementById('saveLoad').classList.add('d-none');
+  document.getElementById('saveBtn').disabled = false;
+
+  if (res.exito || res._offline) {
+    await Swal.fire({ title: editId ? 'Producto actualizado' : 'Producto creado', icon: 'success', timer: 1800, showConfirmButton: false });
+    window.location.href = 'lista.html';
+  } else {
+    document.getElementById('formError').textContent = res.mensaje || 'Error al guardar';
+    document.getElementById('formError').classList.remove('d-none');
+  }
+});
+</script>
+<script src="../assets/js/transitions.js"></script>
+</body>
+</html>
