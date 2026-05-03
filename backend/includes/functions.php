@@ -135,6 +135,11 @@ function enviarCorreoOTP($email, $codigo_otp) {
     }
 }
 
+/** Alias usado por backend/test_api.php */
+function enviarOTP($email, $codigo_otp) {
+    return enviarCorreoOTP($email, $codigo_otp);
+}
+
 function obtenerIP() {
     if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
         return $_SERVER['HTTP_CLIENT_IP'];
