@@ -8,6 +8,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $data = json_decode(file_get_contents("php://input"), true) ?: $_POST;
 
+verificarCSRF($data['csrf_token'] ?? '');
+
 $id_usuario = intval($data['id_usuario'] ?? 0);
 $email = sanitizar_input($data['email'] ?? '');
 

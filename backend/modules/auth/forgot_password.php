@@ -62,7 +62,6 @@ try {
     responderJSON([
         "exito" => true,
         "mensaje" => "Si el email está registrado, recibirás un código de recuperación.",
-        "id_usuario" => $usuario['id_usuario'] // En producción, esto no se envía
     ]);
 
 } catch (Exception $e) {

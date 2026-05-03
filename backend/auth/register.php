@@ -1,5 +1,6 @@
 <?php
 // auth/register.php
+session_start();
 require_once __DIR__ . '/../includes/functions.php';
 
 if (estaLogueado()) {
@@ -123,8 +124,82 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
+    <style>
+        /* Fondo oscuro y elegante (sin blanco) */
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1e38 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+        /* Contenedor de las formas animadas */
+        .shapes-container {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: -1;
+            overflow: hidden;
+        }
+        /* Estilo base de las formitas (Verde clarito) */
+        .shape {
+            position: absolute;
+            background: rgba(134, 239, 172, 0.25); /* Verde con opacidad */
+            backdrop-filter: blur(5px);
+            bottom: -150px;
+            animation: floatUp linear infinite;
+        }
+        /* Distintas formitas y velocidades */
+        .circle { left: 10%; width: 80px; height: 80px; border-radius: 50%; animation-duration: 9s; }
+        .square { left: 30%; width: 70px; height: 70px; border-radius: 15px; animation-duration: 12s; animation-delay: 2s; }
+        .triangle { left: 50%; width: 75px; height: 75px; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); animation-duration: 10s; animation-delay: 1s; }
+        .circle-small { left: 70%; width: 40px; height: 40px; border-radius: 50%; animation-duration: 8s; animation-delay: 4s; }
+        .square-small { left: 85%; width: 50px; height: 50px; border-radius: 10px; animation-duration: 11s; animation-delay: 0s; }
+        .diamond { left: 20%; width: 60px; height: 60px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); animation-duration: 13s; animation-delay: 3s; }
+
+        /* Animación más rápida */
+        @keyframes floatUp {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(-120vh) rotate(360deg); opacity: 0; }
+        }
+
+        /* Estilos de la tarjeta oscurecida */
+        .card.shadow {
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
+        }
+        .card .text-muted { color: #94a3b8 !important; }
+        .form-control, .input-group-text {
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #f8fafc;
+        }
+        .form-control:focus {
+            background-color: rgba(15, 23, 42, 0.9);
+            color: #fff;
+            border-color: #4ade80;
+            box-shadow: 0 0 0 0.25rem rgba(74, 222, 128, 0.25);
+        }
+        .text-primary { color: #4ade80 !important; }
+        .btn-primary { background-color: #22c55e; border-color: #22c55e; color: #0f172a; font-weight: bold; }
+        .btn-primary:hover { background-color: #16a34a; border-color: #16a34a; }
+        a { color: #4ade80; }
+        a:hover { color: #22c55e; }
+    </style>
 </head>
-<body class="bg-light">
+<body>
+    <!-- Animación de fondo -->
+    <div class="shapes-container">
+        <div class="shape circle"></div>
+        <div class="shape square"></div>
+        <div class="shape triangle"></div>
+        <div class="shape circle-small"></div>
+        <div class="shape square-small"></div>
+        <div class="shape diamond"></div>
+    </div>
+
     <div class="container">
         <div class="row justify-content-center mt-5">
             <div class="col-md-6">

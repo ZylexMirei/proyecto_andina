@@ -29,10 +29,8 @@ class Database {
             ];
             $this->conn = new PDO($dsn, $this->username, $this->password, $options);
         } catch (PDOException $exception) {
-            error_log("Error de conexión: " . $exception->getMessage());
-            http_response_code(500);
-            echo json_encode(["error" => "Error de conexión a la base de datos"]);
-            exit();
+            // En lugar de matar la ejecución, relanzar la excepción para que el script que llama la maneje.
+            throw new PDOException("Error de conexión a la base de datos: " . $exception->getMessage(), (int)$exception->getCode());
         }
         return $this->conn;
     }

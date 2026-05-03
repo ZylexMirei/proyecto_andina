@@ -15,6 +15,7 @@ $tipo_reporte = sanitizar_input($_GET['tipo'] ?? 'completo'); // completo, resum
 try {
     $database = new Database();
     $db = $database->getConnection();
+    $params = [];
 
     switch ($tipo_reporte) {
         case 'resumen':
@@ -24,9 +25,12 @@ try {
                              SUM(CASE WHEN i.cantidad_actual <= i.stock_minimo AND i.stock_minimo > 0 THEN 1 ELSE 0 END) as productos_criticos,
                              SUM(CASE WHEN i.cantidad_actual = 0 THEN 1 ELSE 0 END) as productos_agotados
                       FROM inventario i
-                      JOIN almacenes a ON i.id_almacen = a.id_almacen" . 
-                      ($id_almacen > 0 ? " WHERE i.id_almacen = {$id_almacen}" : "") . 
-                      " GROUP BY i.id_almacen";
+                      JOIN almacenes a ON i.id_almacen = a.id_almacen";
+            if ($id_almacen > 0) {
+                $query .= " WHERE i.id_almacen = :id_almacen";
+                $params[':id_almacen'] = $id_almacen;
+            }
+            $query .= " GROUP BY i.id_almacen";
             break;
 
         case 'valorizado':
@@ -35,9 +39,12 @@ try {
                              p.precio_referencia,
                              SUM(i.cantidad_actual * p.precio_referencia) as valor_total
                       FROM inventario i
-                      JOIN productos p ON i.id_producto = p.id_producto" .
-                      ($id_almacen > 0 ? " WHERE i.id_almacen = {$id_almacen}" : "") .
-                      " GROUP BY i.id_producto
+                      JOIN productos p ON i.id_producto = p.id_producto";
+            if ($id_almacen > 0) {
+                $query .= " WHERE i.id_almacen = :id_almacen";
+                $params[':id_almacen'] = $id_almacen;
+            }
+            $query .= " GROUP BY i.id_producto
                       ORDER BY valor_total DESC";
             break;
 
@@ -53,14 +60,17 @@ try {
                              (i.cantidad_actual * p.precio_referencia) as valor_inventario
                       FROM inventario i
                       JOIN productos p ON i.id_producto = p.id_producto
-                      JOIN almacenes a ON i.id_almacen = a.id_almacen" .
-                      ($id_almacen > 0 ? " WHERE i.id_almacen = {$id_almacen}" : "") .
-                      " ORDER BY a.nombre, p.nombre";
+                      JOIN almacenes a ON i.id_almacen = a.id_almacen";
+            if ($id_almacen > 0) {
+                $query .= " WHERE i.id_almacen = :id_almacen";
+                $params[':id_almacen'] = $id_almacen;
+            }
+            $query .= " ORDER BY a.nombre, p.nombre";
             break;
     }
 
     $stmt = $db->prepare($query);
-    $stmt->execute();
+    $stmt->execute($params);
     $resultado = $stmt->fetchAll();
 
     // Calcular totales generales
