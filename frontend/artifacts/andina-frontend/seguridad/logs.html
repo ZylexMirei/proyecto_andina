@@ -98,7 +98,7 @@
 const session = Andina.initPage({ activeKey:'seguridad', pageTitle:'Seguridad' });
 if(!session || session.rol!=='Administrador') { window.location.href='../dashboard.html'; }
 
-const logs = Andina.MOCK_DATA.logs_acceso;
+let logs = [];
 
 function renderLogs(data) {
   document.getElementById('tbodyLogs').innerHTML = data.map(l => `<tr>
@@ -112,7 +112,26 @@ function renderLogs(data) {
   $('#tablaLogs').DataTable({ language:{url:'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json'}, order:[[2,'desc']], pageLength:10 });
 }
 
-renderLogs(logs);
+async function cargarBitacoraReal() {
+  document.getElementById('tbodyLogs').innerHTML = '<tr><td colspan="5" class="text-center py-4"><span class="spinner-border spinner-border-sm text-primary me-2"></span>Cargando bitácora de seguridad...</td></tr>';
+  
+  const res = await Andina.apiRequest('listar_logs', {}, 'GET');
+  if (res.exito) {
+    logs = res.logs;
+    renderLogs(logs);
+    
+    // Actualizar las tarjetas de estadísticas (KPIs) de arriba
+    const hoy = new Date().toLocaleDateString('es-BO');
+    const exitososHoy = logs.filter(l => l.resultado === 'Éxito' && new Date(l.fecha).toLocaleDateString('es-BO') === hoy).length;
+    const fallidos = logs.filter(l => l.resultado === 'Fallido').length;
+    document.querySelectorAll('.stat-number')[0].textContent = exitososHoy;
+    document.querySelectorAll('.stat-number')[1].textContent = fallidos;
+  } else {
+    document.getElementById('tbodyLogs').innerHTML = `<tr><td colspan="5" class="text-center text-danger fw-bold py-4">Error MySQL: ${res.error || 'Desconocido'}</td></tr>`;
+  }
+}
+
+cargarBitacoraReal();
 
 document.getElementById('tbodyOtp').innerHTML = Andina.MOCK_DATA.otps.map(o=>`<tr>
   <td><code style="font-size:12.5px;">${o.usuario}</code></td>

@@ -3,7 +3,16 @@
 <head>
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#0a0f1e">
-  <style>html{background:#0a0f1e}</style>
+  <style>
+    html{background:#0a0f1e}
+    /* 👇 AQUÍ PUEDES CAMBIAR EL COLOR DE LOS CORREOS A TU GUSTO 👇 */
+    .mi-color-correo {
+      color: #60a5fa; /* Un azul claro brillante, ideal para fondo oscuro */
+    }
+    .mi-color-correo:hover {
+      color: #93c5fd; /* Un tono aún más claro al pasar el mouse */
+    }
+  </style>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Usuarios — Distribuidora Andina SRL</title>
@@ -21,7 +30,7 @@
       <h1 class="page-title"><i class="bi bi-person-gear me-2"></i>Gestión de Usuarios</h1>
       <p class="page-subtitle">Control de accesos, roles y permisos del sistema</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
       <select class="form-select" id="filtroRol" style="width:150px;" onchange="filtrar()">
         <option value="">Todos los roles</option>
         <option>Administrador</option><option>Gerente</option><option>Empleado</option><option>Cliente</option>
@@ -29,6 +38,9 @@
       <select class="form-select" id="filtroEstado" style="width:140px;" onchange="filtrar()">
         <option value="">Todos</option><option>Activo</option><option>Inactivo</option>
       </select>
+      <button class="btn btn-primary" onclick="abrirModalCrearUsuario()">
+        <i class="bi bi-plus-lg me-1"></i>Nuevo Usuario
+      </button>
     </div>
   </div>
 
@@ -79,6 +91,50 @@
   </div>
 </div>
 
+<!-- Modal Crear Usuario (Solo Admin) -->
+<div class="modal fade" id="modalCrearUsuario" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Crear Nuevo Usuario</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <form id="formCrearUsuario">
+          <div class="mb-3">
+            <label class="form-label">Nombre completo *</label>
+            <input type="text" class="form-control" id="newNombre" placeholder="Ej: Juan Pérez" required>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Usuario *</label>
+              <input type="text" class="form-control" id="newUsername" placeholder="juanperez" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Rol *</label>
+              <select class="form-select" id="newRol" required>
+                <option value="Empleado">🟢 Empleado</option>
+                <option value="Gerente">🔵 Gerente</option>
+                <option value="Administrador">🔴 Administrador</option>
+                <option value="Cliente">⚪ Cliente</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Correo electrónico *</label>
+            <input type="email" class="form-control" id="newEmail" placeholder="juan@andina.bo" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Contraseña temporal *</label>
+            <input type="text" class="form-control" id="newPassword" placeholder="Mínimo 8 caracteres, 1 mayúscula, 1 número" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnGuardarNuevoUsuario" onclick="crearUsuario()"><i class="bi bi-save me-1"></i>Guardar Usuario</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -89,7 +145,7 @@
 const session = Andina.initPage({ activeKey:'usuarios', pageTitle:'Usuarios' });
 if(!session || session.rol!=='Administrador') { Andina.showToast('No tienes permisos','error'); window.location.href='../dashboard.html'; }
 
-let usuarios = JSON.parse(JSON.stringify(Andina.MOCK_DATA.usuarios));
+let usuarios = []; // 0 datos falsos, inicia vacío
 let editUserId = null;
 
 function updateCounters(data) {
@@ -107,14 +163,14 @@ function renderUsuarios(data) {
     return `<tr>
       <td><div class="d-flex align-items-center gap-2">
         <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--secondary),#c3d4f0);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:var(--primary);">${init}</div>
-        <code style="font-size:12.5px;">@${u.username}</code>
+        <span style="font-size:13px; color: #cbd5e1; font-family: monospace;">@${u.username}</span>
       </div></td>
-      <td><strong style="font-size:13px;">${u.nombre}</strong></td>
-      <td><a href="mailto:${u.email}" style="color:var(--primary);text-decoration:none;font-size:12.5px;">${u.email}</a></td>
+      <td><strong style="font-size:13.5px; color: #f8fafc;">${u.nombre}</strong></td>
+      <td><a href="mailto:${u.email}" class="mi-color-correo" style="text-decoration:none;font-size:12.5px;">${u.username} (${u.email})</a></td>
       <td>${Andina.getBadgeRol(u.rol)}</td>
       <td>${Andina.getBadgeEstado(u.estado)}</td>
       <td class="text-center">${verif}</td>
-      <td style="font-size:12px;color:#718096;">${Andina.formatDateTime(u.ultimo_acceso)}</td>
+      <td style="font-size:12px;color:#94a3b8;">${Andina.formatDateTime(u.ultimo_acceso)}</td>
       <td><div class="d-flex gap-1">
         <button class="btn btn-outline-primary btn-xs" onclick="abrirCambioRol(${u.id})" title="Cambiar rol"><i class="bi bi-person-gear"></i></button>
         <button class="btn ${u.estado==='Activo'?'btn-outline-warning':'btn-outline-success'} btn-xs" onclick="toggleEstado(${u.id})" title="${u.estado==='Activo'?'Desactivar':'Activar'}">
@@ -139,13 +195,15 @@ function filtrar() {
 
 // Cargar usuarios reales desde la base de datos
 async function cargarUsuariosReales() {
+  document.getElementById('tbodyUsuarios').innerHTML = '<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm me-2"></div> Cargando base de datos...</td></tr>';
+  
   const respuesta = await Andina.apiRequest('listar_usuarios', {}, 'GET');
   if (respuesta.exito) {
-    usuarios = respuesta.usuarios; // Actualizar la variable global
+    usuarios = respuesta.usuarios; 
     renderUsuarios(usuarios);
   } else {
-    Andina.showToast('Error al cargar la base de datos', 'error');
-    renderUsuarios(usuarios); // Fallback a MOCK_DATA
+    Andina.showToast(respuesta.error || 'Error al conectar con la base de datos', 'error');
+    document.getElementById('tbodyUsuarios').innerHTML = `<tr><td colspan="8" class="text-center text-danger fw-bold py-4">Error MySQL: ${respuesta.error || 'Desconocido'}</td></tr>`;
   }
 }
 
@@ -181,6 +239,35 @@ async function toggleEstado(id) {
     Andina.showToast(`Usuario ${nuevoEstado.toLowerCase()}o correctamente`,'success');
     renderUsuarios(usuarios);
   }
+}
+
+function abrirModalCrearUsuario() {
+  document.getElementById('formCrearUsuario').reset();
+  new bootstrap.Modal(document.getElementById('modalCrearUsuario')).show();
+}
+
+async function crearUsuario() {
+  const nombre = document.getElementById('newNombre').value.trim();
+  const username = document.getElementById('newUsername').value.trim();
+  const rol = document.getElementById('newRol').value;
+  const email = document.getElementById('newEmail').value.trim();
+  const password = document.getElementById('newPassword').value;
+
+  if (!nombre || !username || !email || !password) {
+    Andina.showToast('Por favor, complete todos los campos', 'warning'); return;
+  }
+
+  const btn = document.getElementById('btnGuardarNuevoUsuario');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+
+  const res = await Andina.apiRequest('admin_crear_usuario', { nombre_completo: nombre, username, rol, email, password });
+
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-save me-1"></i>Guardar Usuario';
+  if (res.exito) {
+    bootstrap.Modal.getInstance(document.getElementById('modalCrearUsuario')).hide();
+    Andina.showToast(res.mensaje, 'success');
+    cargarUsuariosReales(); // Refrescar la tabla al instante
+  } else { Andina.showToast(res.error, 'error'); }
 }
 </script>
 <script src="../assets/js/transitions.js"></script>

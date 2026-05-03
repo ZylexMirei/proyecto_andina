@@ -382,6 +382,23 @@ function getBadgeRol(rol) {
   return `<span class="badge ${map[rol] || 'bg-secondary'}">${rol}</span>`;
 }
 
+// ===================== IMAGE PREVIEW =====================
+function setupImagePreview(inputId, previewContainerId) {
+  const input = document.getElementById(inputId);
+  const container = document.getElementById(previewContainerId);
+  if (!input || !container) return;
+  
+  input.addEventListener('input', function() {
+    const url = this.value.trim();
+    if (url) {
+      container.innerHTML = `<img src="${url}" style="width:100%; height:100%; object-fit:contain; border-radius:8px;" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'text-muted text-center p-4\\'><i class=\\'bi bi-image-alt fs-1\\'></i><br>Imagen no encontrada</div>'">`;
+    } else {
+      container.innerHTML = '<div class="text-muted text-center p-4"><i class="bi bi-image fs-1"></i><br>Vista previa</div>';
+    }
+  });
+  if(input.value) input.dispatchEvent(new Event('input'));
+}
+
 // ===================== INICIALIZAR PÁGINA =====================
 function initPage(config = {}) {
   const { activeKey = '', pageTitle = 'Dashboard', requireLogin = true } = config;
@@ -393,6 +410,87 @@ function initPage(config = {}) {
   buildSidebar(activeKey);
   buildNavbar(pageTitle);
   applyRolePermissions();
+
+  // --- FIX VISUAL GLOBAL: Evitar que la barra superior tape el contenido ---
+  if (!document.getElementById('andina-layout-fix')) {
+    const s = document.createElement('style');
+    s.id = 'andina-layout-fix';
+    s.textContent = `
+      /* Asegurar que la página siempre ocupe toda la pantalla */
+      body {
+        min-height: 100vh !important;
+        margin: 0 !important;
+      }
+      /* El cuadro del costado (menú lateral) ocupará siempre el 100% de la altura */
+      #sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        height: 100vh !important;
+        z-index: 1000 !important;
+      }
+      /* Empujar el contenido principal y forzarlo a estirarse */
+      #main-content {
+        padding-top: 95px !important; 
+        min-height: 100vh !important;
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      /* El footer siempre se irá abajo del todo para no dejar huecos */
+      .page-footer {
+        margin-top: auto !important;
+      }
+      /* Darle un respiro a los controles de la tabla (Buscar, Mostrar registros) */
+      .dataTables_wrapper .row:first-child {
+        margin-bottom: 16px !important;
+      }
+      /* Asegurar que el buscador y el selector se vean bien en modo oscuro */
+      .dataTables_filter input, .dataTables_length select {
+        background-color: var(--surface) !important;
+        color: var(--text) !important;
+        border: 1px solid var(--border) !important;
+      }
+      /* Paginación elegante y acorde al sistema (Estilo Dash Button) */
+      .dataTables_wrapper .dataTables_paginate {
+        margin-top: 18px !important;
+        display: flex;
+        justify-content: flex-end;
+        gap: 4px;
+      }
+      .dataTables_wrapper .dataTables_paginate .paginate_button {
+        background: transparent !important;
+        border: 1px solid transparent !important;
+        color: var(--text-muted) !important;
+        padding: 5px 12px !important;
+        border-radius: 6px !important;
+        font-size: 12.5px !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+        transition: all .2s !important;
+      }
+      .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+        background: var(--surface-2) !important;
+        border-color: var(--border) !important;
+        color: var(--text) !important;
+      }
+      .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+      .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+        background: var(--primary) !important;
+        color: #fff !important;
+        border-color: var(--primary) !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+      }
+      .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
+        opacity: 0.3 !important;
+        cursor: not-allowed !important;
+        background: var(--surface) !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+      }
+    `;
+    document.head.appendChild(s);
+  }
+
   return session;
 }
 
@@ -486,5 +584,5 @@ window.Andina = {
   showToast, showLoader, hideLoader, apiRequest, logout,
   formatBs, formatFecha, formatFechaCorta, formatDateTime,
   getBadgeEstado, getBadgeRol, MOCK_DATA, getRoot,
-  applyRolePermissions, toggleTheme, initTheme,
+  applyRolePermissions, toggleTheme, initTheme, setupImagePreview,
 };

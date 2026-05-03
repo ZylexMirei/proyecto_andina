@@ -415,7 +415,34 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 });
 
 function mostrarRecuperar(){
-  Swal.fire({title:'Recuperar contraseña',html:'<p style="font-size:13.5px;color:#718096">Ingresa tu correo para recibir el código de verificación.</p><input type="email" class="form-control mt-2" id="emailRec" placeholder="correo@ejemplo.com">',confirmButtonText:'Enviar código',cancelButtonText:'Cancelar',showCancelButton:true,preConfirm:()=>{const e=document.getElementById('emailRec').value;if(!e){Swal.showValidationMessage('Ingresa tu email');return false;}return e;}}).then(r=>{if(r.isConfirmed){Andina.showToast('Código enviado a '+r.value,'success');setTimeout(()=>window.location.href='verificar.html',1200);}});
+  Swal.fire({
+    title: 'Recuperar contraseña',
+    html: '<p style="font-size:13.5px;color:#718096">Ingresa tu correo para recibir el código de verificación.</p><input type="email" class="form-control mt-2" id="emailRec" placeholder="correo@ejemplo.com">',
+    confirmButtonText: 'Enviar código',
+    cancelButtonText: 'Cancelar',
+    showCancelButton: true,
+    showLoaderOnConfirm: true,
+    preConfirm: async () => {
+      const e = document.getElementById('emailRec').value;
+      if (!e) { Swal.showValidationMessage('Ingresa tu email'); return false; }
+      
+      // Llama a la API de verdad para enviar el correo
+      const res = await Andina.apiRequest('recuperar_password', { email: e });
+      if (res.error) {
+        Swal.showValidationMessage(res.error);
+        return false;
+      }
+      return e;
+    }
+  }).then(r => {
+    if (r.isConfirmed) {
+      localStorage.setItem('andina_otp_email', r.value);
+      localStorage.removeItem('andina_otp_uid'); // Forzamos a que lo busque por correo
+      localStorage.setItem('andina_otp_flow', 'recuperacion');
+      Andina.showToast('Código enviado a ' + r.value, 'success');
+      setTimeout(() => window.location.href = 'verificar.html', 1200);
+    }
+  });
 }
 </script>
 <script src="assets/js/transitions.js"></script>

@@ -37,6 +37,11 @@
       <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
     </div>
 
+    <div id="resetPasswordContainer" class="d-none text-start mb-4">
+      <label class="form-label" style="font-size:13px;color:#718096;font-weight:600;"><i class="bi bi-lock me-1"></i>Nueva contraseña</label>
+      <input type="password" id="newPassword" class="form-control text-center" placeholder="Mín. 8 caracteres, 1 mayúscula, 1 número">
+    </div>
+
     <div id="otpError" class="alert alert-danger d-none mb-3"></div>
 
     <button class="btn btn-primary w-100 py-2 mb-3" id="verifyBtn" onclick="verificarCodigo()">
@@ -50,11 +55,6 @@
     <a href="index.html" class="d-block mt-3" style="font-size:13px;color:#718096;">
       <i class="bi bi-arrow-left me-1"></i>Volver al inicio de sesión
     </a>
-
-    <div class="mt-4 p-3 rounded-3" style="background:#f8faff;border:1px solid #e8f0fe;text-align:left;">
-      <p class="mb-1 fw-bold" style="font-size:12px;color:#4a5568;font-family:'Poppins',sans-serif;">💡 Para demo, usa el código:</p>
-      <p class="mb-0" style="font-size:22px;font-weight:700;letter-spacing:8px;color:var(--primary);font-family:'Poppins',sans-serif;">123456</p>
-    </div>
   </div>
 </div>
 
@@ -62,8 +62,15 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 <script src="assets/js/app.js"></script>
 <script>
+const flow = localStorage.getItem('andina_otp_flow') || 'registro';
 const email = localStorage.getItem('andina_otp_email') || 'tu correo';
 document.getElementById('subtitleEmail').textContent = `Enviamos el código a ${email}`;
+
+if (flow === 'recuperacion') {
+  document.getElementById('resetPasswordContainer').classList.remove('d-none');
+  document.getElementById('verifyBtn').innerHTML = '<i class="bi bi-key me-2"></i>Actualizar Contraseña';
+  document.getElementById('subtitleEmail').textContent = `Ingresa el código que enviamos a tu email y tu nueva contraseña`;
+}
 
 // OTP input navigation
 const inputs = document.querySelectorAll('.otp-input');
@@ -105,26 +112,50 @@ async function verificarCodigo(){
   const codigo=Array.from(inputs).map(i=>i.value).join('');
   const errEl=document.getElementById('otpError');
   if(codigo.length!==6){errEl.textContent='Ingresa los 6 dígitos del código.';errEl.classList.remove('d-none');return;}
-  errEl.classList.add('d-none');
-  document.getElementById('verifyBtn').disabled=true;
-  document.getElementById('verifyBtn').innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Verificando...';
   
-  const uid=localStorage.getItem('andina_otp_uid');
-  const res=await Andina.apiRequest('verificar_otp',{email,codigo,id_usuario:uid?parseInt(uid,10):undefined});
-  
-  if(res.exito||codigo==='123456'){
-    clearInterval(timer);
-    await Swal.fire({title:'¡Cuenta verificada!',text:'Tu cuenta ha sido activada correctamente.',icon:'success',confirmButtonText:'Ir al inicio de sesión'});
-    localStorage.removeItem('andina_otp_email');
-    localStorage.removeItem('andina_otp_nombre');
-    window.location.href='index.html';
+  if (flow === 'recuperacion') {
+    const password = document.getElementById('newPassword').value;
+    if(!password){errEl.textContent='Ingresa tu nueva contraseña.';errEl.classList.remove('d-none');return;}
+    
+    errEl.classList.add('d-none');
+    document.getElementById('verifyBtn').disabled=true;
+    document.getElementById('verifyBtn').innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Actualizando...';
+    
+    const res=await Andina.apiRequest('restablecer_password',{email,codigo,password});
+    if(res.exito){
+      clearInterval(timer);
+      await Swal.fire({title:'¡Contraseña actualizada!',text:'Ya puedes iniciar sesión con tu nueva contraseña.',icon:'success',confirmButtonText:'Ir al inicio de sesión'});
+      localStorage.removeItem('andina_otp_email');
+      localStorage.removeItem('andina_otp_flow');
+      window.location.href='index.html';
+    } else {
+      errEl.textContent=res.error || 'Error al actualizar contraseña.';
+      errEl.classList.remove('d-none');
+      document.getElementById('verifyBtn').disabled=false;
+      document.getElementById('verifyBtn').innerHTML='<i class="bi bi-key me-2"></i>Actualizar Contraseña';
+    }
   } else {
-    errEl.textContent='Código incorrecto. Verifica e intenta de nuevo.';
-    errEl.classList.remove('d-none');
-    inputs.forEach(i=>i.value='');
-    inputs[0].focus();
-    document.getElementById('verifyBtn').disabled=false;
-    document.getElementById('verifyBtn').innerHTML='<i class="bi bi-check-circle me-2"></i>Verificar código';
+    errEl.classList.add('d-none');
+    document.getElementById('verifyBtn').disabled=true;
+    document.getElementById('verifyBtn').innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Verificando...';
+    
+    const uid=localStorage.getItem('andina_otp_uid');
+    const res=await Andina.apiRequest('verificar_otp',{email,codigo,id_usuario:uid?parseInt(uid,10):undefined});
+    
+    if(res.exito){
+      clearInterval(timer);
+      await Swal.fire({title:'¡Cuenta verificada!',text:'Tu cuenta ha sido activada correctamente.',icon:'success',confirmButtonText:'Ir al inicio de sesión'});
+      localStorage.removeItem('andina_otp_email');
+      localStorage.removeItem('andina_otp_nombre');
+      window.location.href='index.html';
+    } else {
+      errEl.textContent=res.error || 'Código incorrecto. Verifica e intenta de nuevo.';
+      errEl.classList.remove('d-none');
+      inputs.forEach(i=>i.value='');
+      inputs[0].focus();
+      document.getElementById('verifyBtn').disabled=false;
+      document.getElementById('verifyBtn').innerHTML='<i class="bi bi-check-circle me-2"></i>Verificar código';
+    }
   }
 }
 
