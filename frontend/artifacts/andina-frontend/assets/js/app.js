@@ -181,10 +181,16 @@ function buildNavbar(pageTitle) {
       <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="${isDark ? 'Modo claro' : 'Modo oscuro'}">
         <i class="bi bi-${isDark ? 'sun' : 'moon'}"></i>
       </button>
-      <button class="navbar-btn" title="Notificaciones" onclick="showNotifications()">
+      <button class="navbar-btn position-relative" title="Notificaciones" data-bs-toggle="dropdown" id="btnNotificaciones">
         <i class="bi bi-bell"></i>
-        <span class="navbar-badge"></span>
+        <span class="navbar-badge" id="badgeNotificaciones" style="display:none; position:absolute; top:-2px; right:-2px; background:#ef4444; color:white; font-size:10px; width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center;">0</span>
       </button>
+      <div class="dropdown-menu dropdown-menu-end p-0 shadow-lg" style="width: 320px; border: 1px solid var(--border); border-radius: 12px; overflow:hidden; z-index: 1050;">
+        <div class="p-2 bg-light border-bottom text-center fw-bold" style="font-size: 13px; color: var(--text-muted);">Notificaciones de Sistema</div>
+        <div id="notifContent" style="max-height: 320px; overflow-y: auto;">
+          <div class="p-3 text-center text-muted" style="font-size: 13px;">Cargando...</div>
+        </div>
+      </div>
       <div class="navbar-user dropdown" data-bs-toggle="dropdown">
         <div class="navbar-user-avatar">${initials}</div>
         <div>
@@ -220,8 +226,31 @@ function closeSidebar() {
   document.getElementById('sidebarOverlay')?.classList.remove('show');
 }
 
-function showNotifications() {
-  showToast('No hay notificaciones nuevas', 'info');
+async function cargarNotificaciones() {
+
+  const res = await apiRequest('obtener_notificaciones', {}, 'GET');
+  const badge = document.getElementById('badgeNotificaciones');
+  const content = document.getElementById('notifContent');
+  
+  if (res && res.exito && res.notificaciones) {
+    const notifs = res.notificaciones;
+    if (notifs.length > 0) {
+      if(badge) { badge.style.display = 'flex'; badge.textContent = notifs.length; }
+      if(content) {
+        content.innerHTML = notifs.map(n => `
+          <a href="#" class="dropdown-item d-flex align-items-start p-3 border-bottom" style="white-space: normal;">
+            <div class="text-${n.tipo} me-3"><i class="bi ${n.icono} fs-5"></i></div>
+            <div>
+              <div style="font-size: 13px; color: var(--text); line-height: 1.4;">${n.mensaje}</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${n.tiempo}</div>
+            </div>
+          </a>`).join('');
+      }
+    } else {
+      if(badge) badge.style.display = 'none';
+      if(content) content.innerHTML = '<div class="p-4 text-center text-muted" style="font-size: 13px;"><i class="bi bi-bell-slash fs-3 d-block mb-2"></i>Todo en orden, sin alertas</div>';
+    }
+  }
 }
 
 // ===================== DARK MODE =====================
@@ -292,7 +321,8 @@ async function apiRequest(accion, data = {}, method = 'POST') {
   try {
     const session = getSession();
     const token = session ? session.token || '' : '';
-    const url = `${API_BASE}?accion=${accion}`;
+    const userId = session ? session.id_usuario || '' : '';
+    const url = `${API_BASE}?accion=${accion}${userId ? '&id_usuario=' + userId : ''}`;
     const options = {
       method,
       headers: { 'Content-Type': 'application/json', 'X-Token': token },
@@ -410,6 +440,7 @@ function initPage(config = {}) {
   buildSidebar(activeKey);
   buildNavbar(pageTitle);
   applyRolePermissions();
+  if (session && session.rol !== 'Cliente') setTimeout(cargarNotificaciones, 500);
 
   // --- FIX VISUAL GLOBAL: Evitar que la barra superior tape el contenido ---
   if (!document.getElementById('andina-layout-fix')) {
@@ -514,19 +545,187 @@ function applyRolePermissions() {
   });
 }
 
+// ===================== SIMULACIÓN DE PAGO (QR / TARJETA / EFECTIVO) =====================
+function procesarPagoSimulado(monto, callback) {
+  const montoFormat = formatBs(monto);
+  
+  Swal.fire({
+    title: 'Selecciona tu método de pago',
+    html: `
+      <div style="margin-bottom: 15px; font-weight: bold; color: var(--primary); font-size: 1.2rem;">
+        Total a pagar: ${montoFormat}
+      </div>
+      <div class="d-flex flex-column gap-3" id="payment-options">
+        <button class="btn btn-outline-primary payment-btn py-3" data-method="QR">
+          <i class="bi bi-qr-code-scan me-2 fs-5"></i> Pago con QR Simple
+        </button>
+        <button class="btn btn-outline-info payment-btn py-3" data-method="Tarjeta">
+          <i class="bi bi-credit-card me-2 fs-5"></i> Tarjeta de Crédito / Débito
+        </button>
+        <button class="btn btn-outline-success payment-btn py-3" data-method="Efectivo">
+          <i class="bi bi-cash-coin me-2 fs-5"></i> Pago en Efectivo (Al entregar)
+        </button>
+      </div>
+    `,
+    showConfirmButton: false,
+    showCancelButton: true,
+    cancelButtonText: 'Cancelar compra',
+    didOpen: () => {
+      const btns = Swal.getHtmlContainer().querySelectorAll('.payment-btn');
+      btns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const method = btn.getAttribute('data-method');
+          Swal.close();
+          mostrarSimulacionPago(method, monto, callback);
+        });
+      });
+    }
+  });
+}
+
+function mostrarSimulacionPago(metodo, monto, callback) {
+  const montoFormat = formatBs(monto);
+  
+  if (metodo === 'QR') {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=PagoAndina${monto}`;
+    Swal.fire({
+      title: 'Escanea el código QR',
+      html: `
+        <p>Abre tu aplicación bancaria y escanea para pagar <strong>${montoFormat}</strong></p>
+        <img src="${qrUrl}" alt="QR Code" style="width: 200px; height: 200px; border-radius: 10px; border: 1px solid var(--border); padding: 10px;">
+        <div class="mt-3 text-muted" style="font-size: 0.85rem;"><i class="bi bi-arrow-repeat spin d-inline-block"></i> Esperando confirmación del banco...</div>
+      `,
+      showCancelButton: true,
+      showConfirmButton: true,
+      confirmButtonText: '<i class="bi bi-check-circle"></i> Simular que ya pagué',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#28a745'
+    }).then((result) => {
+      if (result.isConfirmed) finalizaPago(metodo, callback);
+    });
+
+  } else if (metodo === 'Tarjeta') {
+    Swal.fire({
+      title: 'Pago con Tarjeta',
+      html: `
+        <div style="text-align: left; margin-top: 10px;">
+          <label class="form-label text-muted" style="font-size: 13px;">Número de Tarjeta</label>
+          <input type="text" class="form-control mb-3" placeholder="0000 0000 0000 0000" value="4111 1111 1111 1111">
+          <div class="row">
+            <div class="col-6">
+              <label class="form-label text-muted" style="font-size: 13px;">Vencimiento</label>
+              <input type="text" class="form-control" placeholder="MM/AA" value="12/28">
+            </div>
+            <div class="col-6">
+              <label class="form-label text-muted" style="font-size: 13px;">CVC</label>
+              <input type="text" class="form-control" placeholder="123" value="123">
+            </div>
+          </div>
+          <div class="mt-4 text-center fw-bold text-success fs-5">Monto a cobrar: ${montoFormat}</div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: '<i class="bi bi-shield-lock"></i> Procesar Pago',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#28a745'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        Swal.fire({ title: 'Procesando pago...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        setTimeout(() => finalizaPago(metodo, callback), 1500);
+      }
+    });
+
+  } else if (metodo === 'Efectivo') {
+    Swal.fire({
+      icon: 'info',
+      title: 'Pago contra entrega',
+      text: `Prepararemos tu pedido y cobraremos ${montoFormat} al momento de entregártelo.`,
+      showCancelButton: true,
+      confirmButtonText: 'Confirmar Pedido',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#28a745'
+    }).then((result) => {
+      if (result.isConfirmed) finalizaPago(metodo, callback);
+    });
+  }
+}
+
+function finalizaPago(metodo, callback) {
+  Swal.fire({
+    icon: 'success',
+    title: '¡Pago Confirmado!',
+    text: `El pago mediante ${metodo} ha sido verificado con éxito.`,
+    timer: 2000,
+    showConfirmButton: false
+  }).then(() => {
+    callback(metodo);
+  });
+}
+
+// ===================== RESCATE DE EMERGENCIA (DATOS REALES) =====================
+// Carga síncrona para inyectar MySQL en toda la app antes de que carguen las pantallas.
+// ¡Esto repara la Tienda y cualquier otra pantalla automáticamente!
+let productosMySQL = [];
+let clientesMySQL = [];
+let usuariosMySQL = [];
+try {
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', API_BASE + '?accion=listar_productos', false); // false = síncrono
+  xhr.send(null);
+  if (xhr.status === 200) {
+    const res = JSON.parse(xhr.responseText);
+    if (res.exito && res.productos) {
+      productosMySQL = res.productos.map(p => ({
+        ...p, 
+        id: parseInt(p.id_producto || p.id), 
+        codigo: p.codigo || `PROD-${p.id_producto}`, 
+        nombre: p.nombre,
+        descripcion: p.descripcion || '', 
+        // Atrapamos el precio sin importar cómo se llame tu columna en MySQL
+        precio: parseFloat(p.precio_referencia || p.precio || p.price) || 0,
+        imagen: p.imagen_principal || p.imagen || '', 
+        stock: parseInt(p.stock_total || p.stock || p.cantidad) || 0,
+        stock_min: 20, stock_max: 2000, estado: p.estado || 'Activo',
+        // Atrapamos tu categoría real
+        categoria: p.categoria || p.nombre_categoria || p.id_categoria || 'Sin categoría'
+      }));
+      window.productosGlobales = productosMySQL;
+    }
+  }
+
+  // Rescate de Clientes Reales
+  const xhrC = new XMLHttpRequest();
+  xhrC.open('GET', API_BASE + '?accion=listar_clientes', false);
+  xhrC.send(null);
+  if (xhrC.status === 200) {
+    const resC = JSON.parse(xhrC.responseText);
+    if (resC.exito && resC.clientes) {
+      clientesMySQL = resC.clientes.map(c => ({
+        ...c, 
+        id: parseInt(c.id_cliente || c.id)
+      }));
+    }
+  }
+
+  // Rescate de Usuarios Reales
+  const xhrU = new XMLHttpRequest();
+  xhrU.open('GET', API_BASE + '?accion=listar_usuarios', false);
+  xhrU.send(null);
+  if (xhrU.status === 200) {
+    const resU = JSON.parse(xhrU.responseText);
+    if (resU.exito && resU.usuarios) {
+      usuariosMySQL = resU.usuarios.map(u => ({
+        ...u, 
+        id: parseInt(u.id_usuario || u.id)
+      }));
+    }
+  }
+} catch(e) { console.warn("Error cargando BD", e); }
+
 // ===================== DATOS MOCK =====================
 const MOCK_DATA = {
-  productos: [
-    { id: 1, codigo: 'PIL-001', nombre: 'Leche Entera PIL 1L', categoria: 'Lácteos', precio: 5.50, stock: 340, stock_min: 50, stock_max: 500, estado: 'Normal', imagen: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300&q=80', descripcion: 'Leche entera pasteurizada de alta calidad' },
-    { id: 2, codigo: 'NES-002', nombre: 'Café Nescafé 200g', categoria: 'Bebidas', precio: 15.00, stock: 12, stock_min: 20, stock_max: 200, estado: 'Crítico', imagen: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=300&q=80', descripcion: 'Café soluble instantáneo premium' },
-    { id: 3, codigo: 'VEN-003', nombre: 'Arroz Grano de Oro 1kg', categoria: 'Granos', precio: 8.00, stock: 85, stock_min: 30, stock_max: 300, estado: 'Normal', imagen: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&q=80', descripcion: 'Arroz de grano largo seleccionado' },
-    { id: 4, codigo: 'COC-004', nombre: 'Aceite Cocinero 900ml', categoria: 'Aceites', precio: 12.50, stock: 24, stock_min: 25, stock_max: 200, estado: 'Alerta', imagen: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&q=80', descripcion: 'Aceite vegetal refinado para cocinar' },
-    { id: 5, codigo: 'AZU-005', nombre: 'Azúcar Blanca 1kg', categoria: 'Dulces', precio: 6.00, stock: 180, stock_min: 40, stock_max: 400, estado: 'Normal', imagen: 'https://images.unsplash.com/photo-1558560699-2e620c5e54d0?w=300&q=80', descripcion: 'Azúcar blanca refinada de caña' },
-    { id: 6, codigo: 'PIL-006', nombre: 'Yogurt PIL Frutado 200g', categoria: 'Lácteos', precio: 4.50, stock: 0, stock_min: 30, stock_max: 200, estado: 'Agotado', imagen: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=300&q=80', descripcion: 'Yogurt cremoso con frutas tropicales' },
-    { id: 7, codigo: 'SAL-007', nombre: 'Sal de Mesa 1kg', categoria: 'Condimentos', precio: 2.50, stock: 210, stock_min: 50, stock_max: 500, estado: 'Normal', imagen: 'https://images.unsplash.com/photo-1518110925495-5fe2fda5f761?w=300&q=80', descripcion: 'Sal yodada de mesa fina' },
-    { id: 8, codigo: 'FID-008', nombre: 'Fideo Lucchetti 500g', categoria: 'Pastas', precio: 7.50, stock: 95, stock_min: 30, stock_max: 300, estado: 'Normal', imagen: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=300&q=80', descripcion: 'Fideos de trigo durum premium' },
-  ],
-  clientes: [
+  productos: productosMySQL,
+  clientes: clientesMySQL.length > 0 ? clientesMySQL : [
     { id: 1, razon_social: 'Tienda Doña María', nit_ci: '1234567', contacto: 'María Gutiérrez', telefono: '77812345', email: 'donamaria@gmail.com', direccion: 'Av. Monseñor Rivero 234', estado: 'Activo' },
     { id: 2, razon_social: 'Supermercado La Economía', nit_ci: '9876543', contacto: 'Pedro Vásquez', telefono: '76543210', email: 'laeconomia@gmail.com', direccion: 'Av. Cristo Redentor 1200', estado: 'Activo' },
     { id: 3, razon_social: 'Abarrotes El Sol', nit_ci: '5551234', contacto: 'Rosa Mamani', telefono: '78965412', email: 'elsol@outlook.com', direccion: 'Calle Libertad 456', estado: 'Activo' },
@@ -551,7 +750,7 @@ const MOCK_DATA = {
     { id: 3, codigo: 'OC-2026-003', id_proveedor: 3, proveedor: 'Industrias Venado', fecha: '2026-04-30', estado: 'Recibido', total: 2200.00 },
     { id: 4, codigo: 'OC-2026-004', id_proveedor: 4, proveedor: 'Cocinero SA', fecha: '2026-05-01', estado: 'Pendiente', total: 980.00 },
   ],
-  usuarios: [
+  usuarios: usuariosMySQL.length > 0 ? usuariosMySQL : [
     { id: 1, username: 'admin', nombre: 'Administrador', email: 'admin@andina.bo', rol: 'Administrador', estado: 'Activo', ultimo_acceso: '2026-05-02 08:30', verificado: true },
     { id: 2, username: 'gerente', nombre: 'Gerente', email: 'gerente@andina.bo', rol: 'Gerente', estado: 'Activo', ultimo_acceso: '2026-05-02 09:15', verificado: true },
     { id: 3, username: 'empleado', nombre: 'Empleado', email: 'empleado@andina.bo', rol: 'Empleado', estado: 'Activo', ultimo_acceso: '2026-05-02 07:45', verificado: true },
@@ -582,7 +781,8 @@ window.Andina = {
   getSession, setSession, clearSession, requireAuth, requireClienteAuth,
   hasPermission, initPage, buildSidebar, buildNavbar,
   showToast, showLoader, hideLoader, apiRequest, logout,
-  formatBs, formatFecha, formatFechaCorta, formatDateTime,
-  getBadgeEstado, getBadgeRol, MOCK_DATA, getRoot,
+  formatBs, formatFecha, formatFechaCorta, formatDateTime, procesarPagoSimulado,
+  getBadgeEstado, getBadgeRol, getRoot,
   applyRolePermissions, toggleTheme, initTheme, setupImagePreview,
+  MOCK_DATA,
 };

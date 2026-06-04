@@ -1,0 +1,23 @@
+# ============================================================
+#  Distribuidora Andina — Reglas de seguridad raíz
+# ============================================================
+
+# Bloquear scripts de prueba y diagnóstico: solo localhost puede accederlos
+<FilesMatch "^(test_|verify_setup).*\.php$">
+    Require local
+</FilesMatch>
+
+# Evitar que Apache liste directorios
+Options -Indexes
+
+# Bloquear acceso al .env desde el navegador
+<FilesMatch "^\.env">
+    Require all denied
+</FilesMatch>
+
+# Cabeceras de seguridad básicas
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

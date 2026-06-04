@@ -1,0 +1,11 @@
+# ============================================================
+#  Backend — proteger carpetas internas
+# ============================================================
+
+# No listar directorios
+Options -Indexes
+
+# Bloquear acceso directo a config e includes desde el navegador
+<DirectoryMatch "^.*(config|includes)$">
+    Require all denied
+</DirectoryMatch>

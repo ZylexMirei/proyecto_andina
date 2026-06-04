@@ -52,6 +52,25 @@ function renderCompras(compras, rol) {
     $('#tablaCompras').DataTable({
       language: { url:'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json' },
       order:[[2,'desc']], pageLength:10, destroy:true,
+      dom: '<"d-flex justify-content-between align-items-center mb-3"Bf>rt<"d-flex justify-content-between align-items-center mt-3"ip>',
+      buttons: [
+        {
+          extend: 'csvHtml5',
+          text: '<i class="bi bi-filetype-csv me-1"></i> Descargar Reporte CSV',
+          className: 'btn btn-success btn-sm',
+          title: 'Reporte_Compras_' + new Date().toISOString().split('T')[0],
+          charset: 'utf-8',
+          bom: true,
+          exportOptions: {
+            columns: [0, 1, 2, 3, 4], // Las compras tienen solo 5 columnas de datos
+            format: {
+              body: function (data, row, column, node) {
+                return data.replace(/<[^>]*>?/gm, ' ').replace(/\s\s+/g, ' ').trim();
+              }
+            }
+          }
+        }
+      ]
     });
   }
 }

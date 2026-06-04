@@ -309,8 +309,20 @@ const session = Andina.requireClienteAuth();
 if(!session) throw new Error('no session');
 document.getElementById('saludo').textContent = `Hola, ${session.nombre.split(' ')[0]}!`;
 
-const PRODS = Andina.MOCK_DATA.productos.filter(p=>p.estado!=='Agotado');
+let PRODS = [];
 let catActual = '', vistaActual = 'grid';
+
+async function cargarProductos() {
+  try {
+    const data = await Andina.apiRequest('obtener_productos');
+    PRODS = data.filter(p => p.estado !== 'Agotado');
+    cargarRecs();
+    filtrar();
+  } catch (error) {
+    console.error("Error al cargar productos:", error);
+    Andina.showToast('Error al conectar con la base de datos', 'error');
+  }
+}
 
 function seleccionarCat(btn, cat) {
   document.querySelectorAll('.categoria-btn').forEach(b=>b.classList.remove('active'));
@@ -396,7 +408,7 @@ function cambiarVista(v) {
 }
 
 function verProducto(id) {
-  const p = Andina.MOCK_DATA.productos.find(x=>x.id===id);
+  const p = PRODS.find(x=>x.id===id);
   if(!p) return;
   document.getElementById('mpTitle').textContent = p.nombre;
   document.getElementById('mpBody').innerHTML = `
@@ -439,7 +451,7 @@ function limpiarFiltros() {
 }
 
 function agregarAlCarrito(id, cantidad=1) {
-  const p = Andina.MOCK_DATA.productos.find(x=>x.id===id);
+  const p = PRODS.find(x=>x.id===id);
   if(!p) return;
   Carrito.agregar({...p, cantidad});
   const modal = bootstrap.Modal.getInstance(document.getElementById('modalProducto'));
@@ -464,7 +476,7 @@ function actualizarCarritoBadge() {
 }
 
 function cargarRecs() {
-  const recs = Andina.MOCK_DATA.productos.slice(0,4);
+  const recs = PRODS.slice(0,4);
   document.getElementById('recsGrid').innerHTML = recs.map(p=>`
     <div class="col-6 col-md-3">
       <div class="rec-card" onclick="agregarAlCarrito(${p.id})">
@@ -479,9 +491,8 @@ function cargarRecs() {
     </div>`).join('');
 }
 
-cargarRecs();
-filtrar();
 actualizarCarritoBadge();
+cargarProductos();
 </script>
 <script src="../assets/js/transitions.js"></script>
 </body>

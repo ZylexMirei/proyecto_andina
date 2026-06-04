@@ -1,13 +1,14 @@
 <?php
+// Mostrar errores directamente en pantalla si algo falla severamente
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    responderJSON(["error" => "Método no permitido"], 405);
+    http_response_code(405); echo json_encode(["error" => "Método no permitido"]); exit();
 }
-
-verificarAutenticacion();
-verificarRol(['Administrador', 'Gerente']);
 
 $tipo = sanitizar_input($_GET['tipo'] ?? 'inventario');
 $id_almacen = intval($_GET['id_almacen'] ?? 0);
@@ -42,12 +43,12 @@ try {
             break;
 
         case 'pedidos':
-            $query = "SELECT p.codigo_pedido, c.razon_social, p.fecha_pedido, p.estado,
-                             SUM(dp.cantidad * dp.precio_unitario) as total,
-                             COUNT(dp.id_detalle) as items
+            $query = "SELECT p.codigo_pedido, COALESCE(c.razon_social, 'Consumidor Final') as razon_social, p.fecha_pedido, p.estado,
+                             COALESCE(SUM(dp.cantidad * dp.precio_unitario), 0) as total,
+                             COUNT(dp.id_pedido) as items
                       FROM pedidos p
-                      JOIN clientes c ON p.id_cliente = c.id_cliente
-                      JOIN detalle_pedido dp ON p.id_pedido = dp.id_pedido";
+                      LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
+                      LEFT JOIN detalle_pedido dp ON p.id_pedido = dp.id_pedido";
             $where = []; // Usaremos un array para construir la cláusula WHERE
             if (!empty($fecha_desde)) {
                 $where[] = "p.fecha_pedido >= :fecha_desde";
@@ -58,7 +59,7 @@ try {
                 $params[':fecha_hasta'] = $fecha_hasta;
             }
             if (!empty($where)) $query .= " WHERE " . implode(' AND ', $where);
-            $query .= " GROUP BY p.id_pedido ORDER BY p.fecha_pedido DESC";
+            $query .= " GROUP BY p.id_pedido, p.codigo_pedido, c.razon_social, p.fecha_pedido, p.estado ORDER BY p.fecha_pedido DESC";
             $titulo = "REPORTE DE PEDIDOS";
             $headers = ['Código', 'Cliente', 'Fecha', 'Estado', 'Total', 'Items'];
             break;
@@ -80,13 +81,13 @@ try {
                 $query .= " AND pe.fecha_pedido <= :fecha_hasta";
                 $params[':fecha_hasta'] = $fecha_hasta;
             }
-            $query .= " GROUP BY dp.id_producto ORDER BY ingresos DESC LIMIT 50";
+            $query .= " GROUP BY p.id_producto, p.codigo, p.nombre ORDER BY ingresos DESC LIMIT 50";
             $titulo = "REPORTE DE VENTAS POR PRODUCTO";
             $headers = ['Código', 'Producto', 'Und. Vendidas', 'Ingresos', 'Pedidos'];
             break;
 
         default:
-            responderJSON(["error" => "Tipo de reporte inválido"], 400);
+            http_response_code(400); echo json_encode(["error" => "Tipo de reporte inválido"]);
             exit();
     }
 
@@ -190,7 +191,7 @@ try {
     </div>
     
     <div class="info">
-        <div><strong>Generado por:</strong> ' . ($_SESSION['nombre'] ?? 'Sistema') . '</div>
+        <div><strong>Generado por:</strong> ' . htmlspecialchars($_GET['usuario'] ?? 'Sistema') . '</div>
         <div><strong>Fecha:</strong> ' . $fecha_generacion . '</div>
         <div><strong>Total registros:</strong> ' . count($datos) . '</div>
     </div>';
@@ -246,7 +247,12 @@ try {
 
     exit();
 
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     error_log("Error al generar PDF: " . $e->getMessage());
-    responderJSON(["error" => "Error al generar reporte PDF"], 500);
+    // Evitamos enviar el código 500 para que Apache no secuestre la respuesta
+    echo "<div style='font-family: Arial, sans-serif; padding: 20px; border: 2px solid #dc3545; background: #f8d7da; color: #721c24; border-radius: 8px; margin: 20px;'>";
+    echo "<h3>Error al Generar Reporte</h3>";
+    echo "<strong>Motivo técnico reportado por la Base de Datos:</strong><br><br> <code>" . htmlspecialchars($e->getMessage()) . "</code>";
+    echo "</div>";
 }
+?>

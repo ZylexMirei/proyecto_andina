@@ -109,6 +109,19 @@ header('Content-Type: text/html; charset=utf-8');
             $required_vars = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'MAIL_HOST', 'MAIL_USERNAME', 'MAIL_PASSWORD'];
             foreach ($required_vars as $var) {
                 $value = getEnv($var);
+
+                if ($var === 'DB_PASSWORD') {
+                    if ($value === null) {
+                        $issues[] = ['label' => "Variable $var", 'detail' => 'No configurada'];
+                        continue;
+                    }
+                    if ($value === '') {
+                        $warnings[] = ['label' => "Variable $var", 'detail' => 'No configurada. Si usas una cuenta local de MySQL sin contraseña, puede ser aceptable para desarrollo.'];
+                        echo "<div class='check-item warn'><div class='icon'>⚠</div><div class='content'><div class='label'>$var</div><div class='detail'>Vacía</div></div></div>";
+                        continue;
+                    }
+                }
+
                 if (empty($value)) {
                     $issues[] = ['label' => "Variable $var", 'detail' => 'No configurada'];
                 } else {

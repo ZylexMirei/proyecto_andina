@@ -20,7 +20,7 @@ const Recomendaciones = {
   // Obtener recomendaciones para un producto
   parProducto(prodId, productosData = null, limit = 3) {
     const ids = this.correlacion[prodId] || [];
-    const todos = productosData || window.productosGlobales || Andina.MOCK_DATA.productos;
+    const todos = productosData || window.productosGlobales || [];
     
     let recomendados = ids
       .map(id => todos.find(p => p.id == id || p.id_producto == id))
@@ -53,7 +53,7 @@ const Recomendaciones = {
       });
     });
 
-    const todos = productosData || window.productosGlobales || Andina.MOCK_DATA.productos;
+    const todos = productosData || window.productosGlobales || [];
     // Ordenar por frecuencia de aparición
     const sorted = [...candidatos.entries()]
       .sort((a, b) => b[1] - a[1])
@@ -79,7 +79,7 @@ const Recomendaciones = {
     });
 
     return [...candidatos]
-      .map(id => Andina.MOCK_DATA.productos.find(p => p.id === id))
+      .map(id => (window.productosGlobales || []).find(p => p.id === id))
       .filter(Boolean)
       .filter(p => p.estado !== 'Agotado')
       .slice(0, limit);
@@ -88,7 +88,7 @@ const Recomendaciones = {
   // Productos más vendidos (simulado)
   masVendidos(limit = 4) {
     const ventas = { 1: 320, 3: 280, 5: 210, 8: 190, 4: 160, 7: 140, 2: 95, 6: 80 };
-    return Andina.MOCK_DATA.productos
+    return (window.productosGlobales || [])
       .filter(p => p.estado !== 'Agotado')
       .sort((a, b) => (ventas[b.id] || 0) - (ventas[a.id] || 0))
       .slice(0, limit);

@@ -23,7 +23,8 @@
     </div>
     <div class="d-flex gap-2">
       <button class="btn btn-outline-danger" onclick="exportarPDF()"><i class="bi bi-file-earmark-pdf me-1"></i>Exportar PDF</button>
-      <button class="btn btn-outline-success" onclick="exportarCSV()"><i class="bi bi-filetype-csv me-1"></i>Exportar CSV</button>
+      <button class="btn btn-outline-success" onclick="exportarExcel()"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
+      <button class="btn btn-outline-info" onclick="exportarCSV()"><i class="bi bi-filetype-csv me-1"></i>Exportar CSV</button>
     </div>
   </div>
 
@@ -174,22 +175,68 @@ function renderVentasReport() {
 }
 
 function exportarPDF() {
-  Andina.showToast('Generando reporte PDF...','info');
-  setTimeout(()=>{ window.open('','_blank'); Andina.showToast('PDF generado y descargado','success'); },1500);
+  const tipo = document.getElementById('tipoReporte').value;
+  const fechaDesde = document.getElementById('fechaDesde').value;
+  const fechaHasta = document.getElementById('fechaHasta').value;
+  Andina.showLoader();
+  const url = `/backend/modules/reportes/exportar_pdf.php?tipo=${tipo}&fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}`;
+  fetch(url)
+    .then(r => r.text())
+    .then(html => {
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+      Andina.hideLoader();
+      Andina.showToast('PDF generado correctamente','success');
+    })
+    .catch(e => {
+      Andina.hideLoader();
+      Andina.showToast('Error generando PDF: '+e.message,'error');
+      console.error(e);
+    });
+}
+
+function exportarExcel() {
+  const tipo = document.getElementById('tipoReporte').value;
+  const fechaDesde = document.getElementById('fechaDesde').value;
+  const fechaHasta = document.getElementById('fechaHasta').value;
+  Andina.showLoader();
+  const url = `/backend/modules/reportes/exportar_excel.php?tipo=${tipo}&fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}`;
+  fetch(url)
+    .then(r => r.blob())
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `reporte_${tipo}_${new Date().toISOString().split('T')[0]}.xls`;
+      a.click();
+      Andina.hideLoader();
+      Andina.showToast('Excel exportado correctamente','success');
+    })
+    .catch(e => {
+      Andina.hideLoader();
+      Andina.showToast('Error exportando Excel: '+e.message,'error');
+      console.error(e);
+    });
 }
 
 function exportarCSV() {
-  const rows=[]; const headers=document.querySelectorAll('#theadReporte th');
-  const headerRow=[...headers].map(th=>th.textContent).join(',');
+  const tipo = document.getElementById('tipoReporte').value;
+  const rows=[];
+  const headers=document.querySelectorAll('#theadReporte th');
+  const headerRow=[...headers].map(th=>th.textContent.trim()).join('|');
   rows.push(headerRow);
+  rows.push('-'.repeat(headerRow.length));
   document.querySelectorAll('#tbodyReporte tr').forEach(tr=>{
-    const cols=[...tr.querySelectorAll('td')].map(td=>'"'+td.innerText.replace(/"/g,'""')+'"');
-    rows.push(cols.join(','));
+    const cols=[...tr.querySelectorAll('td')].map(td=>td.innerText.replace(/\|/g,'-').trim());
+    rows.push(cols.join('|'));
   });
-  const blob=new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=`reporte_andina_${document.getElementById('tipoReporte').value}_${new Date().toISOString().split('T')[0]}.csv`;
-  a.click(); Andina.showToast('CSV exportado correctamente','success');
+  const content='\ufeff\n═ REPORTE: '+tipo.toUpperCase()+'\n═ Generado: '+new Date().toLocaleString('es-BO')+'\n═ Distribuidora Andina SRL\n\n'+rows.join('\n')+'\n\n═ Fin del reporte';
+  const blob=new Blob([content],{type:'text/plain;charset=utf-8;'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`reporte_andina_${tipo}_${new Date().toISOString().split('T')[0]}.txt`;
+  a.click();
+  Andina.showToast('Reporte exportado correctamente','success');
 }
 
 // Generar reporte inicial

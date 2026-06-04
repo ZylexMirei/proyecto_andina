@@ -4,9 +4,17 @@
  */
 'use strict';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const session = Andina.initPage({ activeKey:'dashboard', pageTitle:'Dashboard' });
   if (!session) return;
+  
+  // Cargar datos reales de la BD para que las gráficas funcionen
+  const resProd = await Andina.apiRequest('listar_productos', {}, 'GET');
+  const resPed = await Andina.apiRequest('listar_pedidos', {}, 'GET');
+  
+  if (resProd.exito && resProd.productos) Andina.MOCK_DATA.productos = resProd.productos.map(p => ({...p, id: p.id_producto, precio: p.precio_referencia, stock: p.stock_total || 0, stock_min: 20, stock_max: 2000, estado: p.estado || 'Activo'}));
+  if (resPed.exito && resPed.pedidos) Andina.MOCK_DATA.pedidos = resPed.pedidos.map(p => ({...p, total: parseFloat(p.total) || 0}));
+
   buildDashboard(session.rol, session);
 });
 

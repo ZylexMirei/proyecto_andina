@@ -55,6 +55,48 @@ const Carrito = {
   subtotal() {
     return this.obtener().reduce((a, b) => a + (b.precio * b.cantidad), 0);
   },
+
+  // ===================== PROCESAR PAGO CON SIMULADOR =====================
+  procesarCompra() {
+    const items = this.obtener();
+    if (items.length === 0) {
+      if (window.Andina) Andina.showToast('Tu carrito está vacío. Agrega productos primero.', 'warning');
+      return;
+    }
+    
+    const total = this.subtotal();
+    const session = window.Andina ? Andina.getSession() : null;
+    const id_usuario = session ? session.id_usuario : 0;
+    
+    if (!id_usuario) {
+      if (window.Andina) Andina.showToast('Debes iniciar sesión para comprar', 'error');
+      return;
+    }
+
+    // 1. Llamar a la ventana interactiva de SweetAlert en app.js
+    if (window.Andina && typeof Andina.procesarPagoSimulado === 'function') {
+      Andina.procesarPagoSimulado(total, (metodoElegido) => {
+        
+        // 2. Si el cliente completó el pago, guardamos el pedido en la Base de Datos
+        const datosPedido = { id_usuario, items, total, metodo_pago: metodoElegido };
+        
+        Andina.apiRequest('crear_pedido_cliente', datosPedido).then(res => {
+          if (res.exito) {
+            this.vaciar(); // Limpiar localStorage
+            Swal.fire({
+              icon: 'success', title: '¡Compra Exitosa!',
+              text: `Tu pedido ha sido registrado pagando con ${metodoElegido}.`,
+              timer: 3000, showConfirmButton: false
+            }).then(() => { window.location.reload(); });
+          } else {
+            Andina.showToast(res.error || 'Error al guardar el pedido', 'error');
+          }
+        });
+      });
+    } else {
+      console.error("El simulador de pago no está cargado. Revisa app.js");
+    }
+  }
 };
 
 window.Carrito = Carrito;
