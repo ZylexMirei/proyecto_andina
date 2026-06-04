@@ -1,10 +1,10 @@
 <?php
 /**
  * test_api.php
- * 
+ *
  * Archivo de prueba para verificar que la API está funcionando correctamente.
  * Este archivo es SOLO PARA DESARROLLO. No incluir en producción.
- * 
+ *
  * Las credenciales reales están en archivo .env
  */
 
@@ -60,14 +60,14 @@ switch ($accion) {
 
         try {
             $db = (new Database())->getConnection();
-            
+
             $check = $db->prepare("SELECT id_usuario FROM usuarios WHERE email = :email");
             $check->bindParam(':email', $email);
             $check->execute();
             if ($check->rowCount() > 0) {
                 echo json_encode(["error" => "Este correo ya esta registrado"]); exit();
             }
-            
+
             // Verificar si el username ya existe
             $checkUser = $db->prepare("SELECT id_usuario FROM usuarios WHERE username = :username");
             $checkUser->bindParam(':username', $username_form);
@@ -77,13 +77,13 @@ switch ($accion) {
             }
 
             $db->beginTransaction();
-            
+
             $nombres = explode(' ', $nombre_completo, 2);
             $nombre = $nombres[0];
             $apellido = $nombres[1] ?? '';
 
             // 1. Determinar el rol por defecto (4 = Cliente)
-            $id_rol = intval($data['id_rol'] ?? 4); 
+            $id_rol = intval($data['id_rol'] ?? 4);
             $id_empleado = null;
 
             if ($id_rol == 4) {
@@ -100,10 +100,10 @@ switch ($accion) {
                 $stmtE->execute();
                 $id_empleado = $db->lastInsertId();
             }
-            
+
             $hash = password_hash($password, PASSWORD_BCRYPT);
-            
-            // 2. Crear credenciales de usuario 
+
+            // 2. Crear credenciales de usuario
             $stmt = $db->prepare("INSERT INTO usuarios (id_empleado, id_rol, username, password_hash, email) VALUES (:e, :r, :u, :p, :em)");
             $stmt->bindValue(':e', $id_empleado);
             $stmt->bindValue(':r', $id_rol);
@@ -112,10 +112,10 @@ switch ($accion) {
             $stmt->bindValue(':em', $email);
             $stmt->execute();
             $id_usuario = $db->lastInsertId();
-            
+
             $codigo_otp = manejarOTP($db, $id_usuario, $email, 'registro');
             $db->commit();
-            
+
             echo json_encode([
                 "exito" => true,
                 "mensaje" => "Usuario registrado. Revisa tu correo para el código OTP.",
@@ -152,14 +152,14 @@ switch ($accion) {
 
         try {
             $db = (new Database())->getConnection();
-            
+
             $check = $db->prepare("SELECT id_usuario FROM usuarios WHERE email = :email");
             $check->bindValue(':email', $email);
             $check->execute();
             if ($check->rowCount() > 0) {
                 echo json_encode(["error" => "Este correo ya está registrado."]); exit();
             }
-            
+
             $checkUser = $db->prepare("SELECT id_usuario FROM usuarios WHERE username = :username");
             $checkUser->bindValue(':username', $username_form);
             $checkUser->execute();
@@ -176,16 +176,16 @@ switch ($accion) {
             $id_rol = $stmtRol->fetch()['id_rol'];
 
             $db->beginTransaction();
-            
+
             $nombres = explode(' ', $nombre_completo, 2);
             $stmtE = $db->prepare("INSERT INTO empleados (nombre, apellido) VALUES (:n, :a)");
             $stmtE->bindValue(':n', $nombres[0]);
             $stmtE->bindValue(':a', $nombres[1] ?? '');
             $stmtE->execute();
             $id_empleado = $db->lastInsertId();
-            
+
             $hash = password_hash($password, PASSWORD_BCRYPT);
-            
+
             $stmt = $db->prepare("INSERT INTO usuarios (id_empleado, id_rol, username, password_hash, email, email_verificado, estado) VALUES (:e, :r, :u, :p, :em, 1, 'Activo')");
             $stmt->bindValue(':e', $id_empleado);
             $stmt->bindValue(':r', $id_rol);
@@ -193,9 +193,9 @@ switch ($accion) {
             $stmt->bindValue(':p', $hash);
             $stmt->bindValue(':em', $email);
             $stmt->execute();
-            
+
             $db->commit();
-            
+
             echo json_encode(["exito" => true, "mensaje" => "Usuario {$rol_nombre} creado y verificado exitosamente."], JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
             if (isset($db)) $db->rollBack();
@@ -218,7 +218,7 @@ switch ($accion) {
 
         try {
             $db = (new Database())->getConnection();
-            
+
             // Verificar que el email no esté en uso por otro usuario
             $check = $db->prepare("SELECT id_usuario FROM usuarios WHERE email = :email AND id_usuario != :id");
             $check->bindValue(':email', $email);
@@ -227,13 +227,13 @@ switch ($accion) {
             if ($check->rowCount() > 0) {
                 echo json_encode(["error" => "Este correo ya está registrado por otro usuario"]); exit();
             }
-            
+
             // Actualizar usuario
             $stmt = $db->prepare("UPDATE usuarios SET email = :email WHERE id_usuario = :id");
             $stmt->bindValue(':email', $email);
             $stmt->bindValue(':id', $id_usuario);
             $stmt->execute();
-            
+
             // Actualizar cliente si existe
             $stmtCliente = $db->prepare("SELECT id_cliente FROM clientes WHERE email = :email_old LIMIT 1");
             $stmtCliente->bindValue(':email_old', $_SESSION['email'] ?? '');
@@ -248,10 +248,10 @@ switch ($accion) {
                 $updateCliente->bindValue(':id', $cliente['id_cliente']);
                 $updateCliente->execute();
             }
-            
+
             $_SESSION['email'] = $email;
             $_SESSION['nombre'] = $nombre;
-            
+
             echo json_encode(["exito" => true, "mensaje" => "Perfil actualizado correctamente"], JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
             echo json_encode(["error" => $e->getMessage()]);
@@ -274,7 +274,7 @@ switch ($accion) {
 
         try {
             $db = (new Database())->getConnection();
-            
+
             // Obtener hash actual
             $stmt = $db->prepare("SELECT password_hash FROM usuarios WHERE id_usuario = :id");
             $stmt->bindValue(':id', $id_usuario);
@@ -282,19 +282,19 @@ switch ($accion) {
             if ($stmt->rowCount() === 0) {
                 echo json_encode(["error" => "Usuario no encontrado"]); exit();
             }
-            
+
             $user = $stmt->fetch();
             if (!password_verify($password_actual, $user['password_hash'])) {
                 echo json_encode(["error" => "La contraseña actual es incorrecta"]); exit();
             }
-            
+
             // Actualizar contraseña
             $hash = password_hash($password_nueva, PASSWORD_BCRYPT);
             $update = $db->prepare("UPDATE usuarios SET password_hash = :hash WHERE id_usuario = :id");
             $update->bindValue(':hash', $hash);
             $update->bindValue(':id', $id_usuario);
             $update->execute();
-            
+
             echo json_encode(["exito" => true, "mensaje" => "Contraseña actualizada correctamente"], JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
             echo json_encode(["error" => $e->getMessage()]);
@@ -312,7 +312,7 @@ switch ($accion) {
 
         try {
             $db = (new Database())->getConnection();
-            
+
             $stmt = $db->prepare(
                 "SELECT u.*, r.nombre as rol, " .
                 "COALESCE(NULLIF(TRIM(CONCAT_WS(' ', e.nombre, e.apellido)), ''), c.razon_social, u.username) AS nombre_completo " .
@@ -325,17 +325,17 @@ switch ($accion) {
             $stmt->bindValue(':u1', $username);
             $stmt->bindValue(':u2', $username);
             $stmt->execute();
-            
+
             if ($stmt->rowCount() === 0) {
                 echo json_encode(["error" => "❌ Las credenciales proporcionadas no existen en nuestros registros."]); exit();
             }
-            
+
             $user = $stmt->fetch();
-            
+
             if ($user['estado'] !== 'Activo') {
                 echo json_encode(["error" => "⚠️ Su cuenta se encuentra desactivada. Comuníquese con el administrador."]); exit();
             }
-            
+
             if ($user['intentos_fallidos'] >= 5) {
                 echo json_encode(["error" => "⛔ CUENTA BLOQUEADA por seguridad debido a múltiples intentos fallidos."]); exit();
             }
@@ -344,7 +344,7 @@ switch ($accion) {
                 $upd = $db->prepare("UPDATE usuarios SET intentos_fallidos = intentos_fallidos + 1 WHERE id_usuario = :id");
                 $upd->bindValue(':id', $user['id_usuario']);
                 $upd->execute();
-                
+
                 $intentosRestantes = 4 - $user['intentos_fallidos'];
                 if ($intentosRestantes <= 0) {
                     echo json_encode(["error" => "⛔ Cuenta bloqueada. Ha superado el límite de 5 intentos fallidos."]); exit();
@@ -352,7 +352,7 @@ switch ($accion) {
                     echo json_encode(["error" => "❌ Contraseña incorrecta. Le quedan $intentosRestantes intentos antes del bloqueo."]); exit();
                 }
             }
-            
+
             // Si todo está bien, resetear intentos a 0
             $upd = $db->prepare("UPDATE usuarios SET intentos_fallidos = 0, ultimo_acceso = NOW() WHERE id_usuario = :id");
             $upd->bindValue(':id', $user['id_usuario']);
@@ -369,13 +369,13 @@ switch ($accion) {
                 "email" => $user['email'],
                 "token" => $token,
             ];
-            
+
             // Guardar en la bitácora de MongoDB silenciosamente
             registrarAuditoria($user['username'], $user['rol'], "Inicio de sesión en el sistema", "Módulo de Seguridad");
 
             echo json_encode([
                 "exito" => true,
-                "mensaje" => "Inicio de sesion exitoso",
+                "mensaje" => "¡Bienvenido de nuevo a Distribuidora Andina!",
                 "datos" => $datos,
                 "data" => $datos,
             ], JSON_UNESCAPED_UNICODE);
@@ -407,7 +407,7 @@ switch ($accion) {
             if ($id <= 0) {
                 echo json_encode(["error" => "No se ha podido identificar la cuenta a verificar."]); exit();
             }
-            
+
             if (!preg_match('/^[0-9]{6}$/', $codigo)) {
                 echo json_encode(["error" => "Formato inválido: El código debe contener exactamente 6 dígitos numéricos."]); exit();
             }
@@ -415,29 +415,29 @@ switch ($accion) {
             $stmt = $db->prepare("SELECT id_otp, codigo FROM codigos_otp WHERE id_usuario = :id AND activo = 1 AND expira_en > NOW() ORDER BY creado_en DESC LIMIT 1");
             $stmt->bindValue(':id', $id);
             $stmt->execute();
-            
+
             if ($stmt->rowCount() === 0) {
                 echo json_encode(["error" => "El código ha expirado o ya fue utilizado. Por favor, solicita uno nuevo."]); exit();
             }
-            
+
             $otp = $stmt->fetch();
-            
+
             if ($otp['codigo'] !== $codigo) {
                 echo json_encode(["error" => "❌ Código OTP incorrecto. Verifica los números enviados a tu correo e intenta nuevamente."]); exit();
             }
-            
+
             $db->beginTransaction();
             // Invalidar el OTP usado
             $stmt = $db->prepare("UPDATE codigos_otp SET activo = 0 WHERE id_otp = :id");
             $stmt->bindValue(':id', $otp['id_otp']);
             $stmt->execute();
-            
+
             // Marcar el email del usuario como verificado y resetear bloqueos
             $stmt = $db->prepare("UPDATE usuarios SET email_verificado = 1, intentos_fallidos = 0 WHERE id_usuario = :id");
             $stmt->bindValue(':id', $id);
             $stmt->execute();
             $db->commit();
-            
+
             echo json_encode(["exito" => true, "mensaje" => "¡Cuenta verificada exitosamente!"]);
         } catch (Exception $e) {
             if (isset($db)) $db->rollBack();
@@ -493,7 +493,7 @@ switch ($accion) {
 
         try {
             $db = (new Database())->getConnection();
-            
+
             $query = "SELECT id_usuario FROM usuarios WHERE email = :email";
             $stmt = $db->prepare($query);
             $stmt->bindValue(':email', $email);
@@ -533,7 +533,7 @@ switch ($accion) {
 
         try {
             $db = (new Database())->getConnection();
-            
+
             $stmt = $db->prepare("SELECT id_usuario FROM usuarios WHERE email = :e LIMIT 1");
             $stmt->bindValue(':e', $email);
             $stmt->execute();
@@ -596,7 +596,7 @@ switch ($accion) {
 
         try {
             $db = (new Database())->getConnection();
-            
+
             if (!empty($codigo)) {
                 $check = $db->prepare("SELECT id_producto FROM productos WHERE codigo = :c AND id_producto != :id");
                 $check->bindValue(':c', $codigo);
@@ -622,7 +622,7 @@ switch ($accion) {
             if ($has_cat && $id_categoria > 0) $stmt->bindValue(':cat', $id_categoria, PDO::PARAM_INT);
             $stmt->bindValue(':id', $id_producto);
             $stmt->execute();
-            
+
             echo json_encode(["exito" => true, "mensaje" => "Producto actualizado"]);
         } catch (Throwable $e) {
             echo json_encode(["error" => $e->getMessage()]);
@@ -645,7 +645,7 @@ switch ($accion) {
 
         try {
             $db = (new Database())->getConnection();
-            
+
             $check = $db->prepare("SELECT id_producto FROM productos WHERE codigo = :c");
             $check->bindParam(':c', $codigo);
             $check->execute();
@@ -661,7 +661,7 @@ switch ($accion) {
             $stmt->bindValue(':pre', $precio);
             $stmt->bindValue(':img', $imagen !== '' ? $imagen : null);
             $stmt->execute();
-            
+
             echo json_encode([
                 "exito" => true,
                 "mensaje" => "Producto creado",
@@ -678,7 +678,7 @@ switch ($accion) {
             $db = (new Database())->getConnection();
             $stmt = $db->prepare("SELECT p.*, p.imagen_principal as imagen, c.nombre as categoria, COALESCE((SELECT SUM(cantidad_actual) FROM inventario WHERE id_producto = p.id_producto), 0) as stock_total FROM productos p LEFT JOIN categorias c ON p.id_categoria = c.id_categoria WHERE p.estado = 'Activo' OR p.estado IS NULL OR LOWER(p.estado) = 'activo' ORDER BY p.nombre");
             $stmt->execute();
-            
+
             echo json_encode([
                 "exito" => true,
                 "total" => $stmt->rowCount(),
@@ -704,7 +704,7 @@ switch ($accion) {
             $stmt->bindValue(':n', $nombre);
             $stmt->bindValue(':d', $descripcion !== '' ? $descripcion : null);
             $stmt->execute();
-            
+
             echo json_encode([
                 "exito" => true,
                 "mensaje" => "Categoria creada",
@@ -721,7 +721,7 @@ switch ($accion) {
             $db = (new Database())->getConnection();
             $stmt = $db->prepare("SELECT c.*, (SELECT COUNT(*) FROM productos WHERE id_categoria = c.id_categoria AND (estado = 'Activo' OR estado IS NULL OR LOWER(estado) = 'activo')) as total_productos FROM categorias c ORDER BY c.nombre");
             $stmt->execute();
-            
+
             echo json_encode([
                 "exito" => true,
                 "categorias" => $stmt->fetchAll()
@@ -737,7 +737,7 @@ switch ($accion) {
             $db = (new Database())->getConnection();
             $stmt = $db->prepare("SELECT i.*, p.codigo, p.nombre as producto, a.nombre as almacen, CASE WHEN i.cantidad_actual <= i.stock_minimo AND i.stock_minimo > 0 THEN 'CRITICO' WHEN i.cantidad_actual = 0 THEN 'AGOTADO' WHEN i.cantidad_actual <= (i.stock_minimo * 1.3) THEN 'ALERTA' ELSE 'NORMAL' END as estado FROM inventario i JOIN productos p ON i.id_producto = p.id_producto JOIN almacenes a ON i.id_almacen = a.id_almacen ORDER BY i.cantidad_actual ASC");
             $stmt->execute();
-            
+
             echo json_encode([
                 "exito" => true,
                 "total" => $stmt->rowCount(),
@@ -773,7 +773,7 @@ switch ($accion) {
             if ($stmtInv->rowCount() > 0) {
                 $inv = $stmtInv->fetch();
                 $nuevo_stock = $tipo === 'entrada' ? $inv['cantidad_actual'] + $cantidad : $inv['cantidad_actual'] - $cantidad;
-                
+
                 if ($nuevo_stock < 0) {
                     echo json_encode(["error" => "Stock insuficiente en el almacén para realizar esta salida."]); exit();
                 }
@@ -855,7 +855,7 @@ switch ($accion) {
             $stmt->bindValue(':t', $telefono !== '' ? $telefono : null);
             $stmt->bindValue(':e', $email !== '' ? $email : null);
             $stmt->execute();
-            
+
             echo json_encode([
                 "exito" => true,
                 "mensaje" => "Cliente creado",
@@ -872,7 +872,7 @@ switch ($accion) {
             $db = (new Database())->getConnection();
             $stmt = $db->prepare("SELECT * FROM clientes WHERE estado = 'Activo' OR estado IS NULL OR LOWER(estado) = 'activo' ORDER BY razon_social");
             $stmt->execute();
-            
+
             echo json_encode([
                 "exito" => true,
                 "clientes" => $stmt->fetchAll()
@@ -900,7 +900,7 @@ switch ($accion) {
 
         try {
             $db = (new Database())->getConnection();
-            
+
             // Validar que el correo no pertenezca a otro cliente
             if (!empty($email)) {
                 $checkE = $db->prepare("SELECT id_cliente FROM clientes WHERE email = :e AND id_cliente != :id");
@@ -914,7 +914,7 @@ switch ($accion) {
 
             $has_contacto = false;
             try { $db->query("SELECT contacto FROM clientes LIMIT 1"); $has_contacto = true; } catch (Throwable $e) {}
-            
+
             $has_direccion = false;
             try { $db->query("SELECT direccion FROM clientes LIMIT 1"); $has_direccion = true; } catch (Throwable $e) {}
 
@@ -929,7 +929,7 @@ switch ($accion) {
             if ($has_direccion) $upd->bindValue(':d', $direccion !== '' ? $direccion : null);
             $upd->bindValue(':id', $id_cliente);
             $upd->execute();
-            
+
             echo json_encode(["exito" => true, "mensaje" => "Cliente actualizado correctamente"]);
         } catch (Throwable $e) {
             echo json_encode(["error" => "Error al actualizar: " . $e->getMessage()]);
@@ -949,7 +949,7 @@ switch ($accion) {
 
         try {
             $db = (new Database())->getConnection();
-            
+
             // Verificar email duplicado (que no sea del mismo usuario)
             $checkE = $db->prepare("SELECT id_usuario FROM usuarios WHERE email = :e AND id_usuario != :id");
             $checkE->bindValue(':e', $email);
@@ -1005,23 +1005,23 @@ switch ($accion) {
         try {
             $db = (new Database())->getConnection();
             $stmt = $db->prepare(
-                "SELECT u.id_usuario as id, u.username, u.email, u.estado, 
+                "SELECT u.id_usuario as id, u.username, u.email, u.estado,
                         u.ultimo_acceso, u.email_verificado as verificado,
-                        r.nombre as rol, 
-                        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', e.nombre, e.apellido)), ''), c.razon_social, u.username) AS nombre 
-                 FROM usuarios u 
-                 JOIN roles r ON u.id_rol = r.id_rol 
-                 LEFT JOIN empleados e ON u.id_empleado = e.id_empleado 
-                 LEFT JOIN clientes c ON u.email = c.email 
+                        r.nombre as rol,
+                        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', e.nombre, e.apellido)), ''), c.razon_social, u.username) AS nombre
+                 FROM usuarios u
+                 JOIN roles r ON u.id_rol = r.id_rol
+                 LEFT JOIN empleados e ON u.id_empleado = e.id_empleado
+                 LEFT JOIN clientes c ON u.email = c.email
                  ORDER BY u.id_usuario DESC"
             );
             $stmt->execute();
-            
+
             $usuarios = array_map(function($user) {
                 $user['verificado'] = (bool)$user['verificado'];
                 return $user;
             }, $stmt->fetchAll());
-            
+
             echo json_encode([
                 "exito" => true,
                 "usuarios" => $usuarios
@@ -1090,7 +1090,7 @@ switch ($accion) {
             // Obtenemos los últimos 1000 accesos ordenados por el más reciente
             $stmt = $db->prepare("SELECT * FROM log_accesos ORDER BY id_log DESC LIMIT 1000");
             $stmt->execute();
-            
+
             $logs = array_map(function($l) {
                 return [
                     'id' => $l['id_log'] ?? $l['id'] ?? 0,
@@ -1100,7 +1100,7 @@ switch ($accion) {
                     'fecha' => $l['fecha'] ?? $l['creado_en'] ?? $l['fecha_acceso'] ?? $l['timestamp'] ?? date('Y-m-d H:i:s')
                 ];
             }, $stmt->fetchAll());
-            
+
             echo json_encode(["exito" => true, "logs" => $logs], JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
             echo json_encode(["error" => $e->getMessage()]);
@@ -1113,7 +1113,7 @@ switch ($accion) {
             $db = (new Database())->getConnection();
             // Usamos LEFT JOIN para que no se oculte ningún pedido aunque falte algún dato
             $stmt = $db->prepare(
-                "SELECT p.id_pedido as id, p.codigo_pedido as codigo, p.id_cliente, 
+                "SELECT p.id_pedido as id, p.codigo_pedido as codigo, p.id_cliente,
                         COALESCE(c.razon_social, 'Cliente Eliminado/Desconocido') as cliente,
                         p.fecha_pedido as fecha, p.estado, p.id_usuario,
                         COALESCE(NULLIF(TRIM(CONCAT_WS(' ', e.nombre, e.apellido)), ''), us.username, 'Sistema') as creado_por,
@@ -1135,14 +1135,14 @@ switch ($accion) {
     case 'dashboard':
         try {
             $db = (new Database())->getConnection();
-            
+
             // Función auxiliar para conteos seguros y evitar bloqueos si falta una tabla (ej. proveedores)
             $getCount = function($query) use ($db) {
                 try {
                     $stmt = $db->query($query);
                     return $stmt ? (int)$stmt->fetchColumn() : 0;
                 } catch (Throwable $e) {
-                    return 0; 
+                    return 0;
                 }
             };
 
@@ -1151,32 +1151,32 @@ switch ($accion) {
             $clientes = $getCount("SELECT COUNT(*) FROM clientes WHERE estado = 'Activo'");
             $proveedores = $getCount("SELECT COUNT(*) FROM proveedores WHERE estado = 'Activo'");
             $usuarios = $getCount("SELECT COUNT(*) FROM usuarios WHERE estado = 'Activo'");
-            
+
             // Alertas
             $criticos = $getCount("SELECT COUNT(*) FROM inventario WHERE cantidad_actual <= stock_minimo AND stock_minimo > 0");
             $agotados = $getCount("SELECT COUNT(*) FROM inventario WHERE cantidad_actual = 0");
-            
+
             // Pedidos pendientes
             $pedidos = $getCount("SELECT COUNT(*) FROM pedidos WHERE estado IN ('Pendiente', 'Confirmado')");
-            
+
             // Ventas de los últimos 6 meses (Para Gráfico de Líneas/Barras)
             $ventas_mes = [];
             try {
                 $ventas_query = "
-                    SELECT DATE_FORMAT(p.fecha_pedido, '%Y-%m') as mes, SUM(dp.cantidad * dp.precio_unitario) as total_ventas 
+                    SELECT DATE_FORMAT(p.fecha_pedido, '%Y-%m') as mes, SUM(dp.cantidad * dp.precio_unitario) as total_ventas
                     FROM pedidos p
                     JOIN detalle_pedido dp ON p.id_pedido = dp.id_pedido
                     WHERE p.estado = 'Completado' AND p.fecha_pedido >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-                    GROUP BY mes 
+                    GROUP BY mes
                     ORDER BY mes ASC
                 ";
                 $ventas_mes = $db->query($ventas_query)->fetchAll(PDO::FETCH_ASSOC);
             } catch (Throwable $e) {}
-            
+
             $meses_nombres = ['01'=>'Ene', '02'=>'Feb', '03'=>'Mar', '04'=>'Abr', '05'=>'May', '06'=>'Jun', '07'=>'Jul', '08'=>'Ago', '09'=>'Sep', '10'=>'Oct', '11'=>'Nov', '12'=>'Dic'];
             $grafico_labels = [];
             $grafico_data = [];
-            
+
             foreach ($ventas_mes as $v) {
                 if (!empty($v['mes'])) {
                     list($year, $month) = explode('-', $v['mes']);
@@ -1189,12 +1189,12 @@ switch ($accion) {
             $top_productos = [];
             try {
                 $top_productos = $db->query("
-                    SELECT p.id_producto, p.nombre, SUM(dp.cantidad) as total_vendido 
-                    FROM detalle_pedido dp 
-                    JOIN pedidos ped ON dp.id_pedido = ped.id_pedido 
-                    JOIN productos p ON dp.id_producto = p.id_producto 
-                    WHERE ped.estado = 'Completado' 
-                    GROUP BY p.id_producto, p.nombre 
+                    SELECT p.id_producto, p.nombre, SUM(dp.cantidad) as total_vendido
+                    FROM detalle_pedido dp
+                    JOIN pedidos ped ON dp.id_pedido = ped.id_pedido
+                    JOIN productos p ON dp.id_producto = p.id_producto
+                    WHERE ped.estado = 'Completado'
+                    GROUP BY p.id_producto, p.nombre
                     ORDER BY total_vendido DESC LIMIT 5
                 ")->fetchAll(PDO::FETCH_ASSOC);
             } catch (Throwable $e) {}
@@ -1246,7 +1246,7 @@ switch ($accion) {
             $stmt->bindValue(':n', $nombre);
             $stmt->bindValue(':d', $direccion !== '' ? $direccion : null);
             $stmt->execute();
-            
+
             echo json_encode([
                 "exito" => true,
                 "mensaje" => "Almacen creado",
@@ -1272,7 +1272,7 @@ switch ($accion) {
             // Adaptamos las columnas SQL a los nombres exactos que espera tu tienda.html
             $stmt = $db->prepare("SELECT p.id_producto as id, p.codigo, p.nombre, p.descripcion, p.precio_referencia as precio, p.imagen_principal as imagen, c.nombre as categoria, COALESCE((SELECT SUM(cantidad_actual) FROM inventario WHERE id_producto = p.id_producto), 0) as stock, 20 as stock_min, p.estado FROM productos p LEFT JOIN categorias c ON p.id_categoria = c.id_categoria WHERE p.estado = 'Activo' ORDER BY p.nombre");
             $stmt->execute();
-            
+
             // Se devuelve el array directo para que el 'data.filter()' del frontend funcione sin errores
             echo json_encode($stmt->fetchAll(), JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
@@ -1285,13 +1285,13 @@ switch ($accion) {
         $id_usuario = intval($_GET['id_usuario'] ?? $data['id_usuario'] ?? 0);
         try {
             $db = (new Database())->getConnection();
-            
+
             // 1. Buscar el id_cliente usando LEFT JOIN para no perder al usuario
             $stmtC = $db->prepare("SELECT c.id_cliente, u.email, u.username FROM usuarios u LEFT JOIN clientes c ON u.email = c.email WHERE u.id_usuario = :idu");
             $stmtC->bindValue(':idu', $id_usuario);
             $stmtC->execute();
             $cliente = $stmtC->fetch();
-            
+
             $id_cliente = $cliente['id_cliente'] ?? 0;
 
             // Auto-crear cliente si está huérfano en la base de datos
@@ -1322,13 +1322,13 @@ switch ($accion) {
 
             // 3. Traer los items (detalle_pedido) por cada pedido
             $stmtI = $db->prepare("SELECT p.nombre, dp.cantidad, dp.precio_unitario as precio FROM detalle_pedido dp JOIN productos p ON dp.id_producto = p.id_producto WHERE dp.id_pedido = :idp");
-            
+
             foreach ($pedidos as &$ped) {
                 $stmtI->bindValue(':idp', $ped['id']);
                 $stmtI->execute();
                 $ped['items'] = $stmtI->fetchAll();
             }
-            
+
             echo json_encode($pedidos, JSON_UNESCAPED_UNICODE);
         } catch (Throwable $e) {
             echo json_encode([]);
@@ -1351,7 +1351,7 @@ switch ($accion) {
             $stmtC->bindValue(':idu', $id_usuario);
             $stmtC->execute();
             $cliente = $stmtC->fetch();
-            
+
             $id_cliente = $cliente['id_cliente'] ?? null;
             $email_cliente = $cliente['email'] ?? $cliente['u_email'] ?? '';
             $nombre_cliente = $cliente['razon_social'] ?? $cliente['username'] ?? 'Cliente';
@@ -1362,7 +1362,7 @@ switch ($accion) {
                 $stmtC2->bindValue(':rz', $nombre_cliente);
                 $stmtC2->bindValue(':em', $email_cliente);
                 $stmtC2->execute();
-                
+
                 if ($stmtC2->rowCount() > 0) {
                     $id_cliente = $stmtC2->fetchColumn();
                 } else {
@@ -1381,7 +1381,7 @@ switch ($accion) {
             // Auto-descubrir columnas de la tabla pedidos para un INSERT perfecto
             $has_total = false;
             try { $db->query("SELECT total FROM pedidos LIMIT 1"); $has_total = true; } catch (Throwable $e) {}
-            
+
             $col_usuario = 'id_usuario';
             try { $db->query("SELECT id_usuario_creador FROM pedidos LIMIT 1"); $col_usuario = 'id_usuario_creador'; } catch (Throwable $e) {}
 
@@ -1389,7 +1389,7 @@ switch ($accion) {
             try { $db->query("SELECT metodo_pago FROM pedidos LIMIT 1"); $has_metodo = true; } catch (Throwable $e) {}
 
             $sql = "INSERT INTO pedidos (codigo_pedido, id_cliente, $col_usuario, fecha_pedido, estado" . ($has_total ? ", total" : "") . ($has_metodo ? ", metodo_pago" : "") . ") VALUES (:cod, :idc, :idu, NOW(), 'Pendiente'" . ($has_total ? ", :tot" : "") . ($has_metodo ? ", :metodo" : "") . ")";
-            
+
             $codigo = 'PED-' . date('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':cod', $codigo);
@@ -1413,9 +1413,9 @@ switch ($accion) {
                 $stmtDet->bindValue(':pre', $item['precio']);
                 $stmtDet->execute();
             }
-            
+
             $db->commit();
-            
+
             // Enviar factura (Con Try/Catch para que no rompa el pedido si falla el SMTP)
             try {
                 if (!empty($email_cliente)) {
@@ -1424,7 +1424,7 @@ switch ($accion) {
             } catch (Throwable $e) {
                 // Ignorar si el correo falla, el pedido ya se guardó con éxito
             }
-            
+
             echo json_encode(["exito" => true]);
         } catch (Exception $e) {
             if (isset($db)) $db->rollBack();
@@ -1437,7 +1437,7 @@ switch ($accion) {
         $codigo = sanitizar_input($data['codigo'] ?? '');
         // Guardamos los cupones reales aquí, evitando ensuciar el HTML con "Mock Data"
         $cupones = ['ANDINA2026' => 10, 'DESCUENTO15' => 15, 'PROMO20' => 20, 'EXPO2026' => 25];
-        
+
         if (array_key_exists($codigo, $cupones)) {
             echo json_encode(["descuento" => $cupones[$codigo]]);
         } else {
@@ -1450,7 +1450,7 @@ switch ($accion) {
         try {
             $db = (new Database())->getConnection();
             $notificaciones = [];
-            
+
             try {
                 $stmtC = $db->query("SELECT p.nombre, i.cantidad_actual FROM inventario i JOIN productos p ON i.id_producto = p.id_producto WHERE i.cantidad_actual <= i.stock_minimo AND i.stock_minimo > 0 LIMIT 5");
                 while ($stmtC && $row = $stmtC->fetch(PDO::FETCH_ASSOC)) {
@@ -1460,7 +1460,7 @@ switch ($accion) {
                     ];
                 }
             } catch (Throwable $e) {}
-            
+
             try {
                 $stmtP = $db->query("SELECT codigo_pedido FROM pedidos WHERE estado = 'Pendiente' LIMIT 5");
                 while ($stmtP && $row = $stmtP->fetch(PDO::FETCH_ASSOC)) {
@@ -1470,7 +1470,7 @@ switch ($accion) {
                     ];
                 }
             } catch (Throwable $e) {}
-            
+
             echo json_encode(["exito" => true, "notificaciones" => $notificaciones], JSON_UNESCAPED_UNICODE);
         } catch (Throwable $e) {
             echo json_encode(["error" => $e->getMessage()]);
