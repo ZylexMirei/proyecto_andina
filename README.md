@@ -12,7 +12,6 @@ Sistema de gestión para operaciones, inventario y ventas. Backend en PHP (MySQL
 ## Puesta en marcha
 
 **Windows:** `setup.bat`  
-**Linux / macOS:** `chmod +x setup.sh` y `./setup.sh`
 
 **Manual**
 
