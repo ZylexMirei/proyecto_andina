@@ -1436,7 +1436,7 @@ switch ($accion) {
     case 'validar_cupon':
         $codigo = sanitizar_input($data['codigo'] ?? '');
         // Guardamos los cupones reales aquí, evitando ensuciar el HTML con "Mock Data"
-        $cupones = ['ANDINA2026' => 10, 'DESCUENTO15' => 15, 'PROMO20' => 20];
+        $cupones = ['ANDINA2026' => 10, 'DESCUENTO15' => 15, 'PROMO20' => 20, 'EXPO2026' => 25];
         
         if (array_key_exists($codigo, $cupones)) {
             echo json_encode(["descuento" => $cupones[$codigo]]);
