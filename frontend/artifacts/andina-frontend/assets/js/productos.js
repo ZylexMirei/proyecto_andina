@@ -16,21 +16,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Traer los productos reales desde el backend PHP
   const res = await Andina.apiRequest('listar_productos', {}, 'GET');
-  if (res.exito) {
+  if (res.exito && res.productos) {
     // Adaptar los nombres de la BD (ej. precio_referencia) a los que usa tu diseño
     productosData = res.productos.map(p => ({
       ...p,
       id: p.id_producto,
       precio: p.precio_referencia,
       imagen: p.imagen_principal,
-      stock: 150, // Dato simulado temporal visual
+      stock: p.stock_total || 0,
       stock_min: 20,
       stock_max: 2000,
+      estado: p.estado || 'Activo',
       categoria: p.categoria || 'Sin categoría'
+   
     }));
+    
+    if (productosData.length === 0) {
+      Andina.showToast('La BD está vacía. Añade tu primer producto.', 'info');
+    }
   } else {
-    Andina.showToast('Error cargando BD, mostrando prueba', 'error');
-    productosData = Andina.MOCK_DATA.productos;
+      Andina.showToast('Error cargando BD. Verifica conexión.', 'error');
+      productosData = [];
   }
 
   // Poblar el filtro de categorías en la parte de arriba dinámicamente con tu BD
@@ -100,6 +106,26 @@ function renderTabla(productos, rol) {
     order: [[0, 'asc']],
     pageLength: 10,
     destroy: true,
+    dom: '<"d-flex justify-content-between align-items-center mb-3"Bf>rt<"d-flex justify-content-between align-items-center mt-3"ip>',
+    buttons: [
+      {
+        extend: 'csvHtml5',
+        text: '<i class="bi bi-filetype-csv me-1"></i> Descargar Reporte CSV',
+        className: 'btn btn-success btn-sm',
+        title: 'Reporte_Productos_' + new Date().toISOString().split('T')[0],
+        charset: 'utf-8',
+        bom: true, // Hace que Excel reconozca las tildes y las 'ñ'
+        exportOptions: {
+          columns: [0, 1, 2, 3, 4, 5], // Selecciona solo las columnas de datos (excluye acciones)
+          format: {
+            body: function (data, row, column, node) {
+              // Limpia todo el HTML (etiquetas, colores, divs) dejando solo texto puro
+              return data.replace(/<[^>]*>?/gm, ' ').replace(/\s\s+/g, ' ').trim();
+            }
+          }
+        }
+      }
+    ]
   });
 
   // Aplicar permisos

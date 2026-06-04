@@ -207,13 +207,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     echo "<div class='card' style='border-left-color: #00aa00;'>";
     echo "<h2>3️⃣ Si No Llega el Correo</h2>";
     echo "<ol>";
-    echo "<li><strong>Abre tu correo Gmail</strong></li>";
+    echo "<li><strong>Abre tu cliente de correo</strong></li>";
     echo "<li>Revisa la carpeta <strong>SPAM o BASURA</strong></li>";
     echo "<li>Si no está ahí, comprueba que:</li>";
     echo "<ul>";
-    echo "<li>Tienes <strong>Verificación en 2 pasos</strong> habilitada en Google</li>";
-    echo "<li>Usas una <strong>contraseña de aplicación</strong> (no contraseña normal)</li>";
-    echo "<li>La contraseña en .env está entre comillas si tiene espacios</li>";
+    echo "<li>Los datos en <strong>.env</strong> (MAIL_HOST, MAIL_PORT, etc.) son correctos para tu proveedor.</li>";
+    echo "<li>Si usas Gmail, necesitas <strong>Verificación en 2 pasos</strong> y una <strong>contraseña de aplicación</strong>.</li>";
+    echo "<li>Para otros proveedores, usualmente es tu contraseña normal.</li>";
     echo "<li>El servidor puede acceder a puerto 587 (no hay firewall)</li>";
     echo "</ul>";
     echo "</ol>";

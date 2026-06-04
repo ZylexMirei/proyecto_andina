@@ -312,15 +312,19 @@ function vaciarCarrito() {
   }).then(r=>{ if(r.isConfirmed){ Carrito.vaciar(); renderCarrito(); } });
 }
 
-const CUPONES = { ANDINA2026: 10, DESCUENTO15: 15, PROMO20: 20 };
-function aplicarCupon() {
+async function aplicarCupon() {
   const code = document.getElementById('cuponInput').value.trim().toUpperCase();
-  if(CUPONES[code]) {
-    descuentoPct = CUPONES[code];
-    Andina.showToast(`Cupón aplicado: ${descuentoPct}% de descuento`, 'success');
-    calcTotales();
-  } else {
-    Andina.showToast('Cupón inválido o expirado', 'error');
+  try {
+    const res = await Andina.apiRequest('validar_cupon', { codigo: code });
+    if (res && res.descuento) {
+      descuentoPct = parseFloat(res.descuento);
+      Andina.showToast(`Cupón aplicado: ${descuentoPct}% de descuento`, 'success');
+      calcTotales();
+    } else {
+      Andina.showToast('Cupón inválido o expirado', 'error');
+    }
+  } catch (error) {
+    Andina.showToast('Error al validar el cupón', 'error');
   }
 }
 
@@ -329,21 +333,40 @@ async function confirmarPedido() {
   if(!items.length){ Andina.showToast('Tu carrito está vacío','warning'); return; }
   const sub = Carrito.subtotal();
   const total = sub * 1.13 * (1 - descuentoPct/100);
+  
+  // Generar URL para el QR dinámico (Contiene el monto total)
+  const qrData = encodeURIComponent(`Pago a Distribuidora Andina SRL - Total: Bs. ${total.toFixed(2)}`);
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}&color=0f172a&bgcolor=ffffff`;
+
   const r = await Swal.fire({
-    title:'¿Confirmar pedido?',
-    html:`<div class="text-center"><div style="font-size:28px;font-weight:700;color:#38ef7d;font-family:'Space Grotesk',sans-serif;">${Andina.formatBs(total)}</div><p style="font-size:13px;color:#64748b;">${items.length} producto(s) · Entrega estimada: 2-3 días hábiles</p></div>`,
-    icon:'question', showCancelButton:true,
-    confirmButtonText:'<i class="bi bi-check-circle me-1"></i>Confirmar',
-    cancelButtonText:'Revisar',
+    title:'Pago por Código QR',
+    html:`<div class="text-center">
+      <p style="color:#94a3b8; font-size:14px; margin-bottom:10px;">Escanea el código con tu aplicación bancaria para realizar el pago de:</p>
+      <div style="font-size:28px;font-weight:700;color:#38ef7d;font-family:'Space Grotesk',sans-serif;margin-bottom:15px;">${Andina.formatBs(total)}</div>
+      <div style="background:#fff; padding:10px; display:inline-block; border-radius:12px; margin-bottom:15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+        <img src="${qrUrl}" alt="QR de Pago" style="width:180px; height:180px; border-radius:4px;">
+      </div>
+      <p style="font-size:13px;color:#64748b;">${items.length} producto(s) · Entrega estimada: 2-3 días hábiles</p>
+    </div>`,
+    icon:'info', showCancelButton:true,
+    confirmButtonText:'<i class="bi bi-check-circle me-1"></i>Ya pagué, confirmar',
+    cancelButtonText:'Cancelar',
     background:'#111827', color:'#e2e8f0',
     confirmButtonColor:'#00a859', cancelButtonColor:'#1e293b'
   });
   if(!r.isConfirmed) return;
+  
+  // Simular tiempo de validación bancaria para que se vea más real
+  Andina.showLoader();
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
   await Andina.apiRequest('crear_pedido_cliente',{items, total});
   Carrito.vaciar();
+  Andina.hideLoader();
+  
   await Swal.fire({
-    title:'¡Pedido confirmado!',
-    html:'<p style="color:#64748b;">Tu pedido fue registrado. Te contactaremos pronto para coordinar la entrega.</p>',
+    title:'¡Pago exitoso y Pedido confirmado!',
+    html:'<p style="color:#64748b;">Tu pedido fue registrado y el pago verificado. Te contactaremos pronto para coordinar la entrega.</p>',
     icon:'success', confirmButtonText:'Ver mis pedidos',
     background:'#111827', color:'#e2e8f0', confirmButtonColor:'#00a859'
   });

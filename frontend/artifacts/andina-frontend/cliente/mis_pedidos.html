@@ -150,11 +150,18 @@
 const session = Andina.requireClienteAuth();
 if(!session) throw new Error('no session');
 
-const pedidosCliente = [
-  { id:1, codigo:'PED-2026-C001', fecha:'2026-05-02', estado:'Pendiente', items:[{nombre:'Leche Entera PIL 1L',cantidad:10,precio:5.50},{nombre:'Azúcar Blanca 1kg',cantidad:5,precio:6.00}], total:85.00, entrega_est:'5 mayo, 2026' },
-  { id:2, codigo:'PED-2026-C002', fecha:'2026-04-28', estado:'Completado', items:[{nombre:'Café Nescafé 200g',cantidad:3,precio:15.00},{nombre:'Arroz Grano de Oro 1kg',cantidad:8,precio:8.00}], total:109.00, entrega_est:'30 abril, 2026' },
-  { id:3, codigo:'PED-2026-C003', fecha:'2026-04-20', estado:'En tránsito', items:[{nombre:'Aceite Cocinero 900ml',cantidad:6,precio:12.50}], total:75.00, entrega_est:'4 mayo, 2026' },
-];
+let pedidosCliente = [];
+
+async function cargarPedidos() {
+  try {
+    const data = await Andina.apiRequest('obtener_pedidos_cliente');
+    pedidosCliente = data || [];
+    renderPedidos(pedidosCliente);
+  } catch (error) {
+    console.error("Error al cargar pedidos:", error);
+    Andina.showToast('Error de conexión al obtener pedidos', 'error');
+  }
+}
 
 function getEstadoBadge(estado) {
   const map = {
@@ -260,14 +267,74 @@ function verFactura(id) {
           <td style="padding:6px 0;text-align:right;color:#38ef7d;">${Andina.formatBs(i.precio*i.cantidad)}</td>
         </tr>`).join('')}</tbody>
       </table><br>
-      <strong style="color:#38ef7d;font-size:16px;">Total: ${Andina.formatBs(p.total)}</strong>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <strong style="color:#38ef7d;font-size:16px;">Total: ${Andina.formatBs(p.total)}</strong>
+        <button onclick="imprimirFactura(${p.id})" style="background:linear-gradient(135deg,#00a859,#00c6ff); border:none; color:#fff; font-family:'Space Grotesk',sans-serif; font-weight:600; padding:6px 14px; border-radius:6px; cursor:pointer; transition:all 0.2s;"><i class="bi bi-file-earmark-pdf me-1"></i> Descargar PDF</button>
+      </div>
     </div>`,
-    confirmButtonText:'Cerrar',
-    background:'#111827', color:'#e2e8f0', confirmButtonColor:'#1e293b'
+    showConfirmButton:false, showCloseButton:true,
+    background:'#111827', color:'#e2e8f0'
   });
 }
 
-renderPedidos(pedidosCliente);
+function imprimirFactura(id) {
+  const p = pedidosCliente.find(x=>x.id===id);
+  if(!p) return;
+  
+  // Crear ventana para renderizar el PDF limpio
+  const w = window.open('', '_blank');
+  w.document.write(`
+    <html><head><title>Factura_${p.codigo}</title>
+    <style>
+      body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.5; }
+      .header { border-bottom: 2px solid #00a859; padding-bottom: 20px; margin-bottom: 20px; text-align: center; }
+      .header h1 { margin: 0; color: #00a859; font-size: 28px; }
+      .info { margin-bottom: 30px; display: flex; justify-content: space-between; font-size: 14px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+      th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+      th { background: #f8f9fa; font-weight: bold; color: #444; }
+      .text-right { text-align: right; }
+      .text-center { text-align: center; }
+      .total { font-size: 24px; font-weight: bold; color: #00a859; text-align: right; }
+      .footer { text-align: center; font-size: 12px; color: #888; margin-top: 50px; border-top: 1px solid #ddd; padding-top: 20px; }
+      @media print { body { padding: 0; } }
+    </style>
+    </head><body>
+      <div class="header">
+        <h1>Distribuidora Andina SRL</h1>
+        <p>NIT: 1234567890 | Santa Cruz de la Sierra, Bolivia</p>
+        <h2 style="margin-bottom:0;">FACTURA COMERCIAL</h2>
+      </div>
+      <div class="info">
+        <div>
+          <strong>Cliente:</strong> ${session.nombre}<br>
+          <strong>Nro. Pedido:</strong> ${p.codigo}
+        </div>
+        <div class="text-right">
+          <strong>Fecha:</strong> ${Andina.formatFecha(p.fecha)}<br>
+          <strong>Estado:</strong> PAGADO
+        </div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Producto</th>
+          <th class="text-center">Cant.</th>
+          <th class="text-right">Precio Unit.</th>
+          <th class="text-right">Subtotal</th>
+        </tr></thead>
+        <tbody>
+          ${p.items.map(i=>`<tr><td>${i.nombre}</td><td class="text-center">${i.cantidad}</td><td class="text-right">${Andina.formatBs(i.precio)}</td><td class="text-right">${Andina.formatBs(i.precio*i.cantidad)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="total">TOTAL A PAGAR: ${Andina.formatBs(p.total)}</div>
+      <div class="footer">Esta es una representación impresa de su recibo de compra en línea.<br>¡Gracias por su preferencia!</div>
+      <script>window.onload = () => { window.print(); window.close(); }<\/script>
+    </body></html>
+  `);
+  w.document.close();
+}
+
+cargarPedidos();
 </script>
 <script src="../assets/js/transitions.js"></script>
 </body>

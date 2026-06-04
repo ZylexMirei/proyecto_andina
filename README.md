@@ -5,7 +5,7 @@ Sistema de gestión para operaciones, inventario y ventas. Backend en PHP (MySQL
 ## Requisitos
 
 - PHP 7.4+ (extensiones: `pdo_mysql`, `json`, `mbstring`)
-- MySQL 5.7+ / MariaDB
+- MySQL 5.7+ / MySQL Workbench
 - Composer
 - Node.js 18+ y npm (solo para compilar el frontend)
 
@@ -19,9 +19,12 @@ Sistema de gestión para operaciones, inventario y ventas. Backend en PHP (MySQL
 1. Copiar `.env.example` a `.env` y completar credenciales.
 2. PHP: `cd backend` y `composer install`.
 3. Frontend: `cd frontend/artifacts/andina-frontend`, luego `npm install` y `npm run build`.
-4. Crear la base de datos. Abre una terminal en la raíz del proyecto y ejecuta el comando correspondiente a tu terminal:
+4. Crear la base de datos. Puedes usar phpMyAdmin, MySQL Workbench o la terminal:
+   - **phpMyAdmin (WAMP/XAMPP):** Entra a `http://localhost/phpmyadmin`, ve a "Importar" y sube el archivo SQL de esquema proporcionado.
    - **CMD (Command Prompt):** `mysql -u root -p < schema.sql`
    - **PowerShell:** `Get-Content schema.sql | mysql -u root -p`
+   - Si usas WAMP y tu servidor MySQL corre en puerto `3308`, actualiza `DB_PORT=3308` en `.env`.
+   - Si el repositorio no incluye `schema.sql`, crea la base de datos usando el dump o la estructura compartida por el equipo.
 5. Revisar en el navegador: `verify_setup.php` (misma raíz del proyecto que sirve el servidor web).
 
 ## Cómo Ejecutar (Desarrollo)
@@ -49,10 +52,10 @@ El servidor de desarrollo de Vite reenviará automáticamente las peticiones de 
 | Uso | Variables |
 |-----|-----------|
 | Base de datos | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` |
-| Correo (Gmail: contraseña de aplicación) | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_*` |
+| Correo (SMTP) | `MAIL_HOST`, `MAIL_PORT`, `MAIL_ENCRYPTION` (tls/ssl), `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_*` |
 | Entorno | `ENVIRONMENT`, `DEBUG_MODE`, `APP_URL`, `ALLOWED_ORIGINS` |
 
-No subas nunca el `.env` real al repositorio. Para Gmail con OTP, activa 2FA y crea una contraseña de aplicación en la cuenta de Google.
+No subas nunca el `.env` real al repositorio. Para Gmail, se recomienda usar una "contraseña de aplicación". Para otros proveedores, usa la contraseña normal de la cuenta.
 
 ## Estructura del repositorio
 
@@ -83,6 +86,7 @@ proyecto_andina/
 - Credenciales solo en `.env`; en código usar `getEnv()` / la capa que ya expone el proyecto.
 - HTTPS en producción; ajusta `ALLOWED_ORIGINS` a dominios reales.
 - Contraseñas de usuario con `password_hash` / BCRYPT; formularios con CSRF donde corresponda.
+- **¡Riesgo de exposición!** Si la raíz del proyecto es pública (DocumentRoot = raíz), asegúrate de bloquear el acceso web al archivo `.env` (p. ej., mediante un archivo `.htaccess` en Apache que deniegue el acceso).
 - CORS restringido en `includes/cors.php` según entorno.
 
 ## Despliegue (checklist breve)
@@ -95,7 +99,7 @@ proyecto_andina/
 ## Problemas frecuentes
 
 - **MySQL:** Comprobar puerto (p. ej. 3308) y que el servicio esté en marcha. El comando de importación `mysql ... < schema.sql` es para `cmd.exe`; en **PowerShell** el equivalente es `Get-Content schema.sql | mysql ...`.
-- **Correo:** contraseña de aplicación, no la clave normal de la cuenta.
+- **Correo:** Si usas Gmail, necesitas una "contraseña de aplicación", no la clave normal de la cuenta. Para otros proveedores, la contraseña normal suele funcionar. Verifica el Host, Puerto y tipo de cifrado (TLS/SSL) de tu proveedor.
 - **CORS:** el origen del front debe figurar en `ALLOWED_ORIGINS`.
 
 ## Licencia

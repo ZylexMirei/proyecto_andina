@@ -3,13 +3,33 @@
  */
 'use strict';
 
-document.addEventListener('DOMContentLoaded', () => {
+let pedidosData = []; // Guardará los pedidos reales o simulados
+
+document.addEventListener('DOMContentLoaded', async () => {
   const session = Andina.initPage({ activeKey:'pedidos', pageTitle:'Pedidos' });
   if (!session) return;
 
   const rol = session.rol;
-  let pedidos = Andina.MOCK_DATA.pedidos;
 
+  // Intentar traer pedidos reales de la BD
+  const res = await Andina.apiRequest('listar_pedidos', {}, 'GET');
+  if (res.exito && res.pedidos && res.pedidos.length > 0) {
+    pedidosData = res.pedidos.map(p => ({
+      id: p.id,
+      codigo: p.codigo,
+      cliente: p.cliente,
+      fecha: p.fecha,
+      estado: p.estado,
+      total: parseFloat(p.total),
+      creado_por: p.creado_por,
+      id_usuario: p.id_usuario
+    }));
+  } else {
+    // Fallback a datos imaginarios
+    pedidosData = Andina.MOCK_DATA.pedidos;
+  }
+
+  let pedidos = pedidosData;
   // Empleado solo ve sus pedidos
   if (rol === 'Empleado') {
     pedidos = pedidos.filter(p => p.id_usuario === session.id_usuario);
@@ -20,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('filtroEstado').addEventListener('change', function() {
     const v = this.value;
-    let filtrado = rol==='Empleado' ? Andina.MOCK_DATA.pedidos.filter(p=>p.id_usuario===session.id_usuario) : Andina.MOCK_DATA.pedidos;
+    let filtrado = rol==='Empleado' ? pedidosData.filter(p=>p.id_usuario===session.id_usuario) : pedidosData;
     if(v) filtrado = filtrado.filter(p=>p.estado===v);
     if($.fn.DataTable.isDataTable('#tablaPedidos')) $('#tablaPedidos').DataTable().destroy();
     renderPedidos(filtrado, rol);
@@ -49,12 +69,31 @@ function renderPedidos(pedidos, rol) {
     $('#tablaPedidos').DataTable({
       language: { url:'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json' },
       order:[[2,'desc']], pageLength:10, destroy:true,
+      dom: '<"d-flex justify-content-between align-items-center mb-3"Bf>rt<"d-flex justify-content-between align-items-center mt-3"ip>',
+      buttons: [
+        {
+          extend: 'csvHtml5',
+          text: '<i class="bi bi-filetype-csv me-1"></i> Descargar Reporte CSV',
+          className: 'btn btn-success btn-sm',
+          title: 'Reporte_Pedidos_' + new Date().toISOString().split('T')[0],
+          charset: 'utf-8',
+          bom: true,
+          exportOptions: {
+            columns: [0, 1, 2, 3, 4, 5], // Excluye la columna de acciones (índice 6)
+            format: {
+              body: function (data, row, column, node) {
+                return data.replace(/<[^>]*>?/gm, ' ').replace(/\s\s+/g, ' ').trim();
+              }
+            }
+          }
+        }
+      ]
     });
   }
 }
 
 function verDetallePedido(id) {
-  const p = Andina.MOCK_DATA.pedidos.find(x=>x.id===id);
+  const p = pedidosData.find(x=>x.id===id);
   if(!p) return;
   // Generar detalles simulados
   const items = Andina.MOCK_DATA.productos.slice(0,3).map(prod => `

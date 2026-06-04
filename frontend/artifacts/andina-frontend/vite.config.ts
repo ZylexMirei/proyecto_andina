@@ -49,17 +49,16 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
-    // PHP en otro proceso: php -S 127.0.0.1:8080 -t <raíz repo proyecto_andina>
     proxy: {
       // Redirige CUALQUIER petición que empiece con /backend/ al servidor PHP
       "/backend": {
-        target: process.env.VITE_PHP_ORIGIN ?? "http://127.0.0.1:8080",
+        target: process.env.VITE_PHP_ORIGIN ?? "http://127.0.0.1/proyecto_andina",
         changeOrigin: true,
         secure: false,
       },
       // Redirige la petición específica a /test_api.php al servidor PHP
       "/test_api.php": {
-        target: process.env.VITE_PHP_ORIGIN ?? "http://127.0.0.1:8080",
+        target: process.env.VITE_PHP_ORIGIN ?? "http://127.0.0.1/proyecto_andina",
         changeOrigin: true,
         secure: false,
       },
