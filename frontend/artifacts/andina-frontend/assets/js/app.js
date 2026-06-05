@@ -400,6 +400,10 @@ function getBadgeEstado(estado) {
     'Agotado': 'badge-agotado', 'agotado': 'badge-agotado',
     'Recibido': 'badge-recibido', 'recibido': 'badge-recibido',
     'En tránsito': 'badge-pendiente',
+    'Confirmado': 'badge-aprobado', 'confirmado': 'badge-aprobado',
+    'Enviado': 'badge-alerta', 'enviado': 'badge-alerta',
+    'Entregado': 'badge-completado', 'entregado': 'badge-completado',
+    'Cancelado': 'badge-rechazado', 'cancelado': 'badge-rechazado',
     'Activo': 'badge-completado', 'activo': 'badge-completado',
     'Inactivo': 'badge-agotado', 'inactivo': 'badge-agotado',
   };

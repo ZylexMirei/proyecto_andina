@@ -73,11 +73,22 @@ function method_middleware($metodos) {
 }
 
 /**
+ * Obtiene y cachea los datos de la solicitud para evitar leer php://input múltiples veces
+ */
+function get_request_data() {
+    static $data = null;
+    if ($data === null) {
+        $data = json_decode(file_get_contents("php://input"), true) ?: $_POST;
+    }
+    return $data;
+}
+
+/**
  * Verifica el token CSRF en peticiones POST/PUT/DELETE
  */
 function csrf_middleware() {
     if (in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PUT', 'DELETE'])) {
-        $data = json_decode(file_get_contents("php://input"), true) ?: $_POST;
+        $data = get_request_data();
         $token = $data['csrf_token'] ?? '';
         
         if (empty($token)) {
@@ -153,9 +164,9 @@ function api_middleware($config = []) {
     
     // Verificar campos requeridos
     if (!empty($config['campos_requeridos'])) {
-        $data = json_decode(file_get_contents("php://input"), true) ?: $_POST;
+        $data = get_request_data();
         required_fields_middleware($data, $config['campos_requeridos']);
     }
     
-    return json_decode(file_get_contents("php://input"), true) ?: $_POST;
+    return get_request_data();
 }

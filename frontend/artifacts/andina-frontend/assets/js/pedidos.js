@@ -50,9 +50,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 function renderPedidos(pedidos, rol) {
   const tbody = document.getElementById('tbodyPedidos');
   tbody.innerHTML = pedidos.map(p => {
+    let stateActions = '';
+    if (rol === 'Administrador' || rol === 'Gerente') {
+      if (p.estado === 'Pendiente') {
+        stateActions += `<button class="btn btn-outline-success btn-xs" onclick="cambiarEstadoPedido(${p.id}, '${p.codigo}', 'Confirmado')" title="Confirmar Pedido"><i class="bi bi-check-lg"></i></button>`;
+      } else if (p.estado === 'Confirmado') {
+        stateActions += `<button class="btn btn-outline-info btn-xs" onclick="cambiarEstadoPedido(${p.id}, '${p.codigo}', 'Enviado')" title="Marcar como Enviado"><i class="bi bi-truck"></i></button>`;
+      } else if (p.estado === 'Enviado') {
+        stateActions += `<button class="btn btn-outline-success btn-xs" onclick="cambiarEstadoPedido(${p.id}, '${p.codigo}', 'Entregado')" title="Marcar como Entregado"><i class="bi bi-box-seam"></i></button>`;
+      }
+    }
+
     const acciones = `<div class="d-flex gap-1">
       <button class="btn btn-outline-primary btn-xs" onclick="verDetallePedido(${p.id})" title="Ver detalle"><i class="bi bi-eye"></i></button>
-      ${(rol==='Administrador'||rol==='Gerente') ? `<button class="btn btn-outline-danger btn-xs" onclick="cancelarPedido(${p.id},'${p.codigo}')" title="Cancelar"><i class="bi bi-x-circle"></i></button>` : ''}
+      ${stateActions}
+      ${(rol==='Administrador'||rol==='Gerente') && p.estado !== 'Cancelado' ? `<button class="btn btn-outline-danger btn-xs" onclick="cancelarPedido(${p.id},'${p.codigo}')" title="Cancelar"><i class="bi bi-x-circle"></i></button>` : ''}
     </div>`;
     return `<tr>
       <td><code style="font-size:12px;color:var(--primary);">${p.codigo}</code></td>
@@ -97,6 +109,29 @@ function renderPedidos(pedidos, rol) {
       ]
     });
   }
+}
+
+function cambiarEstadoPedido(id, codigo, nuevoEstado) {
+  let mensaje = '';
+  if (nuevoEstado === 'Confirmado') mensaje = `¿Deseas confirmar el pedido <strong>${codigo}</strong>?`;
+  else if (nuevoEstado === 'Enviado') mensaje = `¿El pedido <strong>${codigo}</strong> ha sido enviado / despachado?`;
+  else if (nuevoEstado === 'Entregado') mensaje = `¿El pedido <strong>${codigo}</strong> fue entregado con éxito al cliente?`;
+
+  Swal.fire({
+    title: 'Actualizar Estado',
+    html: mensaje,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, continuar',
+    cancelButtonText: 'No',
+    confirmButtonColor: '#00a859',
+  }).then(async r => {
+    if(r.isConfirmed) {
+      await Andina.apiRequest('cambiar_estado_pedido', { id, estado: nuevoEstado });
+      Andina.showToast(`El pedido pasó a estado: ${nuevoEstado}`, 'success');
+      setTimeout(() => location.reload(), 800);
+    }
+  });
 }
 
 function verDetallePedido(id) {

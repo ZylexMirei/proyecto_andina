@@ -90,7 +90,7 @@ const Recomendaciones = {
     const ventas = { 1: 320, 3: 280, 5: 210, 8: 190, 4: 160, 7: 140, 2: 95, 6: 80 };
     return (window.productosGlobales || [])
       .filter(p => p.estado !== 'Agotado')
-      .sort((a, b) => (ventas[b.id] || 0) - (ventas[a.id] || 0))
+        .sort((a, b) => (ventas[b.id || b.id_producto] || 0) - (ventas[a.id || a.id_producto] || 0))
       .slice(0, limit);
   },
 
@@ -100,7 +100,7 @@ const Recomendaciones = {
     if (recs.length === 0) return '';
     
     const rec = recs[0];
-    const nombreCorto = rec.nombre.split(' ').slice(0, 2).join(' '); // Tomar solo 2 primeras palabras
+      const nombreCorto = (rec.nombre || '').split(' ').slice(0, 2).join(' '); // Tomar solo 2 primeras palabras
     return `
       <div class="recomendacion-bubble" title="Producto recomendado por el sistema">
         <i class="bi bi-lightning-charge-fill" style="color: #f59e0b;"></i> Sugerencia: <strong>${nombreCorto}</strong>

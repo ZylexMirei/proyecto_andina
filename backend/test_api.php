@@ -735,7 +735,7 @@ switch ($accion) {
     case 'inventario':
         try {
             $db = (new Database())->getConnection();
-            $stmt = $db->prepare("SELECT i.*, p.codigo, p.nombre as producto, a.nombre as almacen, CASE WHEN i.cantidad_actual <= i.stock_minimo AND i.stock_minimo > 0 THEN 'CRITICO' WHEN i.cantidad_actual = 0 THEN 'AGOTADO' WHEN i.cantidad_actual <= (i.stock_minimo * 1.3) THEN 'ALERTA' ELSE 'NORMAL' END as estado FROM inventario i JOIN productos p ON i.id_producto = p.id_producto JOIN almacenes a ON i.id_almacen = a.id_almacen ORDER BY i.cantidad_actual ASC");
+            $stmt = $db->prepare("SELECT i.*, p.codigo, p.nombre as producto, a.nombre as almacen, CASE WHEN i.cantidad_actual = 0 THEN 'AGOTADO' WHEN i.cantidad_actual <= i.stock_minimo AND i.stock_minimo > 0 THEN 'CRITICO' WHEN i.cantidad_actual <= (i.stock_minimo * 1.3) THEN 'ALERTA' ELSE 'NORMAL' END as estado FROM inventario i JOIN productos p ON i.id_producto = p.id_producto JOIN almacenes a ON i.id_almacen = a.id_almacen ORDER BY i.cantidad_actual ASC");
             $stmt->execute();
 
             echo json_encode([
@@ -1153,8 +1153,8 @@ switch ($accion) {
             $usuarios = $getCount("SELECT COUNT(*) FROM usuarios WHERE estado = 'Activo'");
 
             // Alertas
-            $criticos = $getCount("SELECT COUNT(*) FROM inventario WHERE cantidad_actual <= stock_minimo AND stock_minimo > 0");
             $agotados = $getCount("SELECT COUNT(*) FROM inventario WHERE cantidad_actual = 0");
+            $criticos = $getCount("SELECT COUNT(*) FROM inventario WHERE cantidad_actual > 0 AND cantidad_actual <= stock_minimo AND stock_minimo > 0");
 
             // Pedidos pendientes
             $pedidos = $getCount("SELECT COUNT(*) FROM pedidos WHERE estado IN ('Pendiente', 'Confirmado')");
