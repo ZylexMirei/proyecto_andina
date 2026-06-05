@@ -1,28 +1,35 @@
 <?php
-// Mostrar errores directamente en pantalla si algo falla severamente
+// Arreglar errores sin mostrar detalle público
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    http_response_code(405); echo json_encode(["error" => "Método no permitido"]); exit();
+    http_response_code(405);
+    echo json_encode(["error" => "Método no permitido"]);
+    exit();
 }
 
 $tipo = sanitizar_input($_GET['tipo'] ?? 'inventario');
-$id_almacen = intval($_GET['id_almacen'] ?? 0);
 $fecha_desde = sanitizar_input($_GET['fecha_desde'] ?? '');
 $fecha_hasta = sanitizar_input($_GET['fecha_hasta'] ?? '');
 
 try {
     $database = new Database();
     $db = $database->getConnection();
+    
+    if (!$db) {
+        throw new Exception('No se pudo conectar a la base de datos');
+    }
+    
     $params = [];
 
     switch ($tipo) {
         case 'inventario':
-            $query = "SELECT p.codigo, p.nombre, a.nombre as almacen, 
+            $query = "SELECT p.codigo, p.nombre, a.nombre as almacen,
                              i.cantidad_actual, i.stock_minimo, i.stock_maximo,
                              CASE 
                                 WHEN i.cantidad_actual = 0 THEN 'AGOTADO'
@@ -32,22 +39,267 @@ try {
                              (i.cantidad_actual * p.precio_referencia) as valor
                       FROM inventario i
                       JOIN productos p ON i.id_producto = p.id_producto
-                      JOIN almacenes a ON i.id_almacen = a.id_almacen";
-            if ($id_almacen > 0) {
-                $query .= " WHERE i.id_almacen = :id_almacen";
-                $params[':id_almacen'] = $id_almacen;
-            }
-            $query .= " ORDER BY a.nombre, p.nombre";
+                      LEFT JOIN almacenes a ON i.id_almacen = a.id_almacen
+                      ORDER BY a.nombre, p.nombre";
             $titulo = "REPORTE DE INVENTARIO";
             $headers = ['Código', 'Producto', 'Almacén', 'Stock', 'Mínimo', 'Máximo', 'Estado', 'Valor'];
             break;
 
         case 'pedidos':
-            $query = "SELECT p.codigo_pedido, COALESCE(c.razon_social, 'Consumidor Final') as razon_social, p.fecha_pedido, p.estado,
-                             COALESCE(SUM(dp.cantidad * dp.precio_unitario), 0) as total,
-                             COUNT(dp.id_pedido) as items
+            $query = "SELECT p.codigo_pedido, 
+                             COALESCE(c.razon_social, 'Consumidor Final') as razon_social, 
+                             p.fecha_pedido, 
+                             p.estado,
+                             COALESCE(p.total, 0) as total
                       FROM pedidos p
-                      LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
+                      LEFT JOIN clientes c ON p.id_cliente = c.id_cliente";
+            $where = [];
+            if (!empty($fecha_desde)) {
+                $where[] = "DATE(p.fecha_pedido) >= :fecha_desde";
+                $params[':fecha_desde'] = $fecha_desde;
+            }
+            if (!empty($fecha_hasta)) {
+                $where[] = "DATE(p.fecha_pedido) <= :fecha_hasta";
+                $params[':fecha_hasta'] = $fecha_hasta;
+            }
+            if (!empty($where)) {
+                $query .= " WHERE " . implode(' AND ', $where);
+            }
+            $query .= " ORDER BY p.fecha_pedido DESC LIMIT 500";
+            $titulo = "REPORTE DE PEDIDOS";
+            $headers = ['Código', 'Cliente', 'Fecha', 'Estado', 'Total'];
+            break;
+
+        case 'ventas':
+            $query = "SELECT p.codigo, p.nombre,
+                             SUM(COALESCE(dp.cantidad, 0)) as unidades_vendidas,
+                             SUM(COALESCE(dp.cantidad * dp.precio_unitario, 0)) as ingresos
+                      FROM productos p
+                      LEFT JOIN detalle_pedido dp ON p.id_producto = dp.id_producto
+                      LEFT JOIN pedidos pe ON dp.id_pedido = pe.id_pedido";
+            $where = ["pe.estado IS NULL OR pe.estado != 'Cancelado'"];
+            if (!empty($fecha_desde)) {
+                $where[] = "DATE(pe.fecha_pedido) >= :fecha_desde";
+                $params[':fecha_desde'] = $fecha_desde;
+            }
+            if (!empty($fecha_hasta)) {
+                $where[] = "DATE(pe.fecha_pedido) <= :fecha_hasta";
+                $params[':fecha_hasta'] = $fecha_hasta;
+            }
+            $query .= " WHERE " . implode(' AND ', $where);
+            $query .= " GROUP BY p.id_producto, p.codigo, p.nombre 
+                       ORDER BY ingresos DESC LIMIT 50";
+            $titulo = "REPORTE DE VENTAS POR PRODUCTO";
+            $headers = ['Código', 'Producto', 'Und. Vendidas', 'Ingresos'];
+            break;
+
+        default:
+            throw new Exception('Tipo de reporte inválido');
+    }
+
+    $stmt = $db->prepare($query);
+    $stmt->execute($params);
+    $datos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!$datos) {
+        $datos = [];
+    }
+
+    // Generar HTML
+    $fecha_generacion = date('d/m/Y H:i:s');
+    
+    header('Content-Type: text/html; charset=utf-8');
+    header('Content-Disposition: inline; filename="reporte_' . $tipo . '_' . date('Ymd') . '.html"');
+
+    echo '<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>' . htmlspecialchars($titulo) . '</title>
+    <style>
+        @media print {
+            body { margin: 0; padding: 10px; }
+            .no-print { display: none; }
+            @page { size: A4 landscape; margin: 10mm; }
+        }
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px;
+            color: #333;
+        }
+        .header { 
+            text-align: center; 
+            border-bottom: 3px solid #0d6efd; 
+            padding-bottom: 10px; 
+            margin-bottom: 20px; 
+        }
+        .header h1 { color: #0d6efd; margin: 0; }
+        .header .subtitle { color: #666; font-size: 14px; }
+        .info { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 15px;
+            font-size: 12px;
+            color: #666;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 11px;
+        }
+        th { 
+            background-color: #0d6efd; 
+            color: white; 
+            padding: 8px; 
+            text-align: left; 
+            font-size: 10px;
+        }
+        td { 
+            padding: 6px 8px; 
+            border-bottom: 1px solid #ddd; 
+        }
+        tr:nth-child(even) { background-color: #f8f9fa; }
+        .estado-critico { color: #dc3545; font-weight: bold; }
+        .estado-agotado { color: #dc3545; font-weight: bold; background-color: #ffe6e6; }
+        .estado-normal { color: #28a745; }
+        .total-row { 
+            font-weight: bold; 
+            background-color: #e9ecef !important; 
+        }
+        .footer { 
+            text-align: center; 
+            font-size: 10px; 
+            color: #999; 
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+        .btn-imprimir {
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .btn-imprimir:hover { background-color: #0b5ed7; }
+    </style>
+</head>
+<body>
+    <button class="btn-imprimir no-print" onclick="window.print()">
+        📄 Imprimir / Guardar como PDF
+    </button>
+    
+    <div class="header">
+        <h1>DISTRIBUIDORA ANDINA SRL</h1>
+        <h2>' . htmlspecialchars($titulo) . '</h2>
+        <div class="subtitle">Sistema Inteligente de Gestión de Cadena de Suministro</div>
+    </div>
+    
+    <div class="info">
+        <div><strong>Generado por:</strong> Sistema</div>
+        <div><strong>Fecha:</strong> ' . htmlspecialchars($fecha_generacion) . '</div>
+        <div><strong>Total registros:</strong> ' . count($datos) . '</div>
+    </div>';
+
+    // Mostrar tabla
+    echo '<table>
+        <thead>
+            <tr>';
+    foreach ($headers as $header) {
+        echo '<th>' . htmlspecialchars($header) . '</th>';
+    }
+    echo '</tr>
+        </thead>
+        <tbody>';
+
+    $total_valor = 0;
+    foreach ($datos as $row) {
+        echo '<tr>';
+        foreach ($row as $key => $value) {
+            $clase = '';
+            if ($key === 'estado' && in_array(strtoupper($value), ['AGOTADO', 'CRÍTICO', 'NORMAL'])) {
+                $clase = 'estado-' . strtolower($value);
+            }
+            $display = htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
+            if (in_array($key, ['valor', 'total', 'ingresos']) && is_numeric($value)) {
+                $display = 'Bs. ' . number_format($value, 2);
+            }
+            echo '<td class="' . $clase . '">' . $display . '</td>';
+        }
+        echo '</tr>';
+        
+        if (isset($row['valor'])) $total_valor += floatval($row['valor'] ?? 0);
+        if (isset($row['total'])) $total_valor += floatval($row['total'] ?? 0);
+        if (isset($row['ingresos'])) $total_valor += floatval($row['ingresos'] ?? 0);
+    }
+
+    // Fila de totales si hay datos
+    if (count($datos) > 0) {
+        echo '<tr class="total-row">
+                <td colspan="' . (count($headers) - 1) . '"><strong>TOTAL</strong></td>
+                <td><strong>Bs. ' . number_format($total_valor, 2) . '</strong></td>
+              </tr>';
+    }
+
+    echo '</tbody>
+    </table>
+    
+    <div class="footer">
+        <p>Distribuidora Andina SRL - Documento generado automáticamente</p>
+        <p>Este reporte es confidencial y para uso interno de la empresa</p>
+    </div>
+    
+    <script>
+        // Auto-imprimir al cargar (opcional, descomentar si se desea)
+        // window.onload = function() { window.print(); }
+    </script>
+</body>
+</html>';
+
+    exit();
+
+} catch (Throwable $e) {
+    error_log("Error en exportar_pdf.php: " . $e->getMessage());
+    header('Content-Type: text/html; charset=utf-8');
+    echo "<!DOCTYPE html>
+<html lang='es'>
+<head>
+    <meta charset='UTF-8'>
+    <title>Error en Reporte</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
+        .error-box { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 2px solid #f5c6cb; 
+            padding: 20px; 
+            border-radius: 8px; 
+            max-width: 600px; 
+            margin: 20px auto;
+        }
+        .error-box h2 { margin-top: 0; }
+        .error-code { font-family: monospace; background: #fff; padding: 10px; border-radius: 4px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class='error-box'>
+        <h2>⚠️ Error al Generar Reporte</h2>
+        <p>Lo sentimos, no fue posible generar el reporte en este momento.</p>
+        <p><strong>Por favor:</strong></p>
+        <ul>
+            <li>Verifica que hayas seleccionado correctamente los filtros</li>
+            <li>Intenta nuevamente en unos segundos</li>
+            <li>Si el problema persiste, contacta al administrador del sistema</li>
+        </ul>
+    </div>
+</body>
+</html>";
+    exit();
+}
+?>
                       LEFT JOIN detalle_pedido dp ON p.id_pedido = dp.id_pedido";
             $where = []; // Usaremos un array para construir la cláusula WHERE
             if (!empty($fecha_desde)) {

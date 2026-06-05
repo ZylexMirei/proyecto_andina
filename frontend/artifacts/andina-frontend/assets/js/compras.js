@@ -58,7 +58,9 @@ function renderCompras(compras, rol) {
           extend: 'csvHtml5',
           text: '<i class="bi bi-filetype-csv me-1"></i> Descargar Reporte CSV',
           className: 'btn btn-success btn-sm',
-          title: 'Reporte_Compras_' + new Date().toISOString().split('T')[0],
+          filename: 'Reporte_Compras_' + new Date().toISOString().split('T')[0],
+          extension: '.csv',
+          title: '',
           charset: 'utf-8',
           bom: true,
           exportOptions: {
@@ -68,16 +70,20 @@ function renderCompras(compras, rol) {
                 return data.replace(/<[^>]*>?/gm, ' ').replace(/\s\s+/g, ' ').trim();
               }
             }
+      },
+      action: function (e, dt, node, config) {
+        $.fn.dataTable.ext.buttons.csvHtml5.action.call(this, e, dt, node, config);
+        setTimeout(() => {
+          document.body.classList.remove('page-exit');
+          const overlay = document.getElementById('page-overlay');
+          if (overlay) overlay.classList.add('hidden');
+        }, 100);
           }
         },
         {
-          extend: 'print',
           text: '<i class="bi bi-file-earmark-pdf me-1"></i> Exportar a PDF',
           className: 'btn btn-danger btn-sm ms-2',
-          title: 'Reporte de Compras - Distribuidora Andina',
-          exportOptions: {
-            columns: [0, 1, 2, 3, 4] // Excluye acciones
-          }
+        action: function() { window.print(); }
         }
       ]
     });

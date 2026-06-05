@@ -275,11 +275,11 @@ function buildDashboard(rol, session) {
             <span style="color:#ff4e50;"><i class="bi bi-exclamation-triangle-fill me-2"></i>Alertas inventario</span>
             <a href="inventario/ver.html" class="dash-btn-sm">Ver todo</a>
           </div>
-          <div class="dash-card-body p-0">
+          <div class="alertas-container">
             ${productos.filter(p=>p.estado!=='Normal').map(p=>{
               const pct=Math.max(0,Math.min(100,Math.round((p.stock/p.stock_max)*100)));
               const c=p.estado==='Agotado'?'#ff4e50':p.estado==='Crítico'?'#f7971e':'#ffd200';
-              return `<div style="padding:10px 16px;border-bottom:1px solid var(--border);">
+              return `<div class="alerta-item">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <span style="font-size:12.5px;font-weight:600;color:var(--text);">${p.nombre}</span>
                   ${Andina.getBadgeEstado(p.estado)}
@@ -428,6 +428,38 @@ function buildDashboard(rol, session) {
         color:var(--text);
       }
       .dash-table tbody tr:hover td { background:rgba(0,198,255,0.04) !important; }
+
+      /* ALERTAS INVENTARIO - Scroll compacto */
+      .alertas-container {
+        max-height: 420px;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+      .alertas-container::-webkit-scrollbar {
+        width: 4px;
+      }
+      .alertas-container::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .alertas-container::-webkit-scrollbar-thumb {
+        background: rgba(0,168,89,0.3);
+        border-radius: 2px;
+      }
+      .alertas-container::-webkit-scrollbar-thumb:hover {
+        background: rgba(0,168,89,0.5);
+      }
+      .alerta-item {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+        transition: all 0.2s ease;
+        background: transparent;
+      }
+      .alerta-item:last-child {
+        border-bottom: none;
+      }
+      .alerta-item:hover {
+        background: rgba(255,255,255,0.02);
+      }
     `;
     document.head.appendChild(s);
   }

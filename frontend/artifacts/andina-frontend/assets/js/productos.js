@@ -83,6 +83,7 @@ function renderTabla(productos, rol) {
     const acciones = `
       <div class="d-flex gap-1">
         <a href="crear.html?id=${p.id}" class="btn btn-outline-primary btn-xs" title="Editar" data-role-manager><i class="bi bi-pencil"></i></a>
+        <button class="btn btn-outline-success btn-xs" title="Cambiar Imagen" onclick="cambiarImagenProducto(${p.id})" data-role-manager><i class="bi bi-image"></i></button>
         <button class="btn btn-outline-danger btn-xs" title="Desactivar" onclick="desactivarProducto(${p.id},'${p.nombre}')" data-role-admin><i class="bi bi-trash3"></i></button>
         <button class="btn btn-outline-secondary btn-xs" title="Ver detalle" onclick="verDetalle(${p.id})"><i class="bi bi-eye"></i></button>
       </div>`;
@@ -112,7 +113,9 @@ function renderTabla(productos, rol) {
         extend: 'csvHtml5',
         text: '<i class="bi bi-filetype-csv me-1"></i> Descargar Reporte CSV',
         className: 'btn btn-success btn-sm',
-        title: 'Reporte_Productos_' + new Date().toISOString().split('T')[0],
+        filename: 'Reporte_Productos_' + new Date().toISOString().split('T')[0],
+        extension: '.csv',
+        title: '',
         charset: 'utf-8',
         bom: true, // Hace que Excel reconozca las tildes y las 'ñ'
         exportOptions: {
@@ -123,7 +126,20 @@ function renderTabla(productos, rol) {
               return data.replace(/<[^>]*>?/gm, ' ').replace(/\s\s+/g, ' ').trim();
             }
           }
+      },
+      action: function (e, dt, node, config) {
+        $.fn.dataTable.ext.buttons.csvHtml5.action.call(this, e, dt, node, config);
+        setTimeout(() => {
+          document.body.classList.remove('page-exit');
+          const overlay = document.getElementById('page-overlay');
+          if (overlay) overlay.classList.add('hidden');
+        }, 100);
         }
+    },
+    {
+      text: '<i class="bi bi-file-earmark-pdf me-1"></i> Exportar a PDF',
+      className: 'btn btn-danger btn-sm ms-2',
+      action: function() { window.print(); }
       }
     ]
   });
@@ -189,6 +205,48 @@ function verDetalle(id) {
       </div>
     </div>`;
   new bootstrap.Modal(document.getElementById('modalDetalle')).show();
+}
+
+function cambiarImagenProducto(id) {
+  const p = productosData.find(x => x.id === id);
+  if (!p) return;
+
+  Swal.fire({
+    title: 'Actualizar Imagen',
+    text: 'Pega el enlace (URL) de la nueva imagen para: ' + p.nombre,
+    input: 'url',
+    inputPlaceholder: 'https://ejemplo.com/imagen.jpg',
+    inputValue: p.imagen || '',
+    showCancelButton: true,
+    confirmButtonText: '<i class="bi bi-cloud-arrow-up me-1"></i> Guardar Imagen',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#00a859'
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      const nuevaImg = result.value;
+      
+      const res = await Andina.apiRequest('editar_producto', {
+        id_producto: p.id,
+        codigo: p.codigo,
+        nombre: p.nombre,
+        descripcion: p.descripcion || '',
+        precio: p.precio,
+        imagen_principal: nuevaImg,
+        id_categoria: p.id_categoria || 0,
+        estado: p.estado
+      });
+
+      if (res.exito) {
+        Andina.showToast('Imagen actualizada correctamente', 'success');
+        p.imagen = nuevaImg; // Actualizamos el dato localmente
+        // Truco de magia: Forzamos al buscador a re-dibujar la tabla al instante
+        const buscador = document.getElementById('buscador');
+        if (buscador) buscador.dispatchEvent(new Event('input'));
+      } else {
+        Andina.showToast(res.error || 'Error al actualizar imagen', 'error');
+      }
+    }
+  });
 }
 
 function desactivarProducto(id, nombre) {

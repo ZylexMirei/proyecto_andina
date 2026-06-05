@@ -1115,3 +1115,18 @@ body.page-exit {
   transition: opacity 0.22s ease;
 }
 #page-overlay.hidden { opacity: 0; }
+
+/* ===================== PRINT STYLES (PDF REPORTES) ===================== */
+@media print {
+  body { background: white !important; color: black !important; }
+  #sidebar, #navbar, .dt-buttons, .dataTables_filter, .dataTables_length, .dataTables_info, .dataTables_paginate, .page-header, .btn-xs, .btn-sm {
+    display: none !important;
+  }
+  #main-content { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+  .card { box-shadow: none !important; border: none !important; }
+  .card-header { background: white !important; color: black !important; border-bottom: 2px solid #1a3a5c !important; }
+  .table { width: 100% !important; color: black !important; }
+  .table thead th { background: #f0f0f0 !important; color: black !important; border: 1px solid #ccc !important; }
+  .table tbody td { border: 1px solid #eee !important; color: black !important; }
+  .badge { border: 1px solid #ccc !important; color: black !important; background: transparent !important; }
+}
