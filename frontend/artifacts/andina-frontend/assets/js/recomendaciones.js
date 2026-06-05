@@ -102,8 +102,8 @@ const Recomendaciones = {
     const rec = recs[0];
     const nombreCorto = rec.nombre.split(' ').slice(0, 2).join(' '); // Tomar solo 2 primeras palabras
     return `
-      <div class="recomendacion-bubble" title="Basado en compras de otros clientes">
-        <i class="bi bi-stars"></i> Ideal con: <strong>${nombreCorto}</strong>
+      <div class="recomendacion-bubble" title="Producto recomendado por el sistema">
+        <i class="bi bi-lightning-charge-fill" style="color: #f59e0b;"></i> Sugerencia: <strong>${nombreCorto}</strong>
       </div>
     `;
   },
