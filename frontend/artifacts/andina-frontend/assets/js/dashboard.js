@@ -91,7 +91,7 @@ function buildDashboard(rol, session) {
           <i class="bi bi-speedometer2 me-2" style="color:var(--accent);font-size:20px;"></i>
           ${saludo}, ${session.nombre.split(' ')[0]}
         </h1>
-        <p class="page-subtitle">${Andina.formatFecha(new Date())} &nbsp;·&nbsp; ${session.rol}</p>
+        <p class="page-subtitle"><span id="relojEnVivo">${Andina.formatFecha(new Date())}</span> &nbsp;·&nbsp; ${session.rol}</p>
       </div>
       <div class="d-flex gap-2 align-items-center">
         <span class="live-dot-badge">
@@ -295,6 +295,15 @@ function buildDashboard(rol, session) {
       </div>
     </div>
   `;
+
+  // Iniciar reloj en vivo
+  setInterval(() => {
+    const el = document.getElementById('relojEnVivo');
+    if (el) {
+      const ahora = new Date();
+      el.textContent = Andina.formatFecha(ahora) + ' ' + ahora.toLocaleTimeString('es-BO');
+    }
+  }, 1000);
 
   // --- STYLES inline para nuevos componentes ---
   if (!document.getElementById('dash-extra-styles')) {

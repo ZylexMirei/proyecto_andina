@@ -86,6 +86,15 @@ function renderPedidos(pedidos, rol) {
               }
             }
           }
+        },
+        {
+          extend: 'print',
+          text: '<i class="bi bi-file-earmark-pdf me-1"></i> Exportar a PDF',
+          className: 'btn btn-danger btn-sm ms-2',
+          title: 'Reporte de Pedidos - Distribuidora Andina',
+          exportOptions: {
+            columns: [0, 1, 2, 3, 4, 5] // Excluye acciones
+          }
         }
       ]
     });
@@ -121,7 +130,15 @@ function verDetallePedido(id) {
           <tfoot><tr><td colspan="3" class="text-end fw-bold">Total</td><td><strong style="color:var(--accent);font-size:15px;">${Andina.formatBs(p.total)}</strong></td></tr></tfoot>
         </table>
       </div>`,
-    confirmButtonText: 'Cerrar',
+    showDenyButton: true,
+    confirmButtonText: '<i class="bi bi-printer me-1"></i> Imprimir Recibo',
+    denyButtonText: 'Cerrar',
+    confirmButtonColor: '#1a3a5c',
+    denyButtonColor: '#6c757d'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      window.print(); // Activa la ventana de impresión del navegador
+    }
   });
 }
 

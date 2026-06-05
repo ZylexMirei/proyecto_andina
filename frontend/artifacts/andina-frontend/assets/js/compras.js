@@ -69,6 +69,15 @@ function renderCompras(compras, rol) {
               }
             }
           }
+        },
+        {
+          extend: 'print',
+          text: '<i class="bi bi-file-earmark-pdf me-1"></i> Exportar a PDF',
+          className: 'btn btn-danger btn-sm ms-2',
+          title: 'Reporte de Compras - Distribuidora Andina',
+          exportOptions: {
+            columns: [0, 1, 2, 3, 4] // Excluye acciones
+          }
         }
       ]
     });
