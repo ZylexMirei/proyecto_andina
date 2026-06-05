@@ -20,7 +20,7 @@
   --sidebar-hover: rgba(255,255,255,0.07);
   --sidebar-active: rgba(0,168,89,0.18);
   --sidebar-border: rgba(255,255,255,0.06);
-  --sidebar-width: 260px;
+  --sidebar-width: clamp(260px, 20vw, 320px);
   --navbar-height: 62px;
 
   --bg: #f0f4f9;
@@ -139,7 +139,7 @@ h1,h2,h3,h4,h5,h6 { font-family: 'Poppins', sans-serif; font-weight: 600; color:
 .sidebar-brand-text { overflow: hidden; }
 .sidebar-brand-name {
   font-family: 'Space Grotesk', sans-serif;
-  font-weight: 700; font-size: 13px; color: #fff;
+  font-weight: 700; font-size: 15px; color: #fff;
   line-height: 1.25; letter-spacing: -0.2px;
 }
 .brand-accent {
@@ -148,7 +148,7 @@ h1,h2,h3,h4,h5,h6 { font-family: 'Poppins', sans-serif; font-weight: 600; color:
   background-clip: text;
 }
 .sidebar-brand-sub {
-  font-size: 9px; color: rgba(255,255,255,0.3);
+  font-size: 10px; color: rgba(255,255,255,0.3);
   text-transform: uppercase; letter-spacing: 0.8px;
   font-family: 'Space Grotesk', sans-serif;
   margin-top: 1px;
@@ -158,7 +158,7 @@ h1,h2,h3,h4,h5,h6 { font-family: 'Poppins', sans-serif; font-weight: 600; color:
 .sidebar-nav::-webkit-scrollbar { width: 2px; }
 
 .sidebar-section-label {
-  font-size: 9.5px; text-transform: uppercase; letter-spacing: 1.2px;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.2px;
   color: rgba(255,255,255,0.25); padding: 16px 20px 6px;
   font-family: 'Poppins', sans-serif; font-weight: 600;
 }
@@ -170,7 +170,7 @@ h1,h2,h3,h4,h5,h6 { font-family: 'Poppins', sans-serif; font-weight: 600; color:
   text-decoration: none;
   border-radius: 0;
   transition: all var(--transition);
-  font-size: 13px;
+  font-size: 14px;
   position: relative;
   cursor: pointer;
   margin: 1px 10px;
