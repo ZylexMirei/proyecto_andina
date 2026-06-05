@@ -442,19 +442,6 @@ function initPage(config = {}) {
   applyRolePermissions();
   if (session && session.rol !== 'Cliente') setTimeout(cargarNotificaciones, 500);
 
-  // --- BOTÓN FLOTANTE DE WHATSAPP (SOLO PARA CLIENTES) ---
-  if (session && session.rol === 'Cliente') {
-    if (!document.getElementById('whatsapp-btn')) {
-      const wa = document.createElement('a');
-      wa.id = 'whatsapp-btn';
-      wa.href = 'https://wa.me/59169713359?text=Hola,%20necesito%20ayuda%20con%20mi%20pedido%20en%20Distribuidora%20Andina';
-      wa.target = '_blank';
-      wa.className = 'whatsapp-float';
-      wa.innerHTML = '<i class="bi bi-whatsapp"></i>';
-      document.body.appendChild(wa);
-    }
-  }
-
   // --- FIX VISUAL GLOBAL: Evitar que la barra superior tape el contenido ---
   if (!document.getElementById('andina-layout-fix')) {
     const s = document.createElement('style');
@@ -664,11 +651,43 @@ function mostrarSimulacionPago(metodo, monto, callback) {
 }
 
 function finalizaPago(metodo, callback) {
+  // Lluvia de confeti
+  const duration = 3000;
+  const end = Date.now() + duration;
+
+  (function frame() {
+    if (typeof confetti === 'undefined') {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js';
+      script.onload = () => frame();
+      document.head.appendChild(script);
+      return;
+    }
+    confetti({
+      particleCount: 5,
+      angle: 60,
+      spread: 55,
+      origin: { x: 0 },
+      colors: ['#00c6ff', '#38ef7d']
+    });
+    confetti({
+      particleCount: 5,
+      angle: 120,
+      spread: 55,
+      origin: { x: 1 },
+      colors: ['#00c6ff', '#38ef7d']
+    });
+
+    if (Date.now() < end) {
+      requestAnimationFrame(frame);
+    }
+  }());
+
   Swal.fire({
     icon: 'success',
     title: '¡Pago Confirmado!',
     text: `El pago mediante ${metodo} ha sido verificado con éxito.`,
-    timer: 2000,
+    timer: 2500,
     showConfirmButton: false
   }).then(() => {
     callback(metodo);
@@ -799,3 +818,6 @@ window.Andina = {
   applyRolePermissions, toggleTheme, initTheme, setupImagePreview,
   MOCK_DATA,
 };
+
+
+
