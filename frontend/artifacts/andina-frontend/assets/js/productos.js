@@ -126,14 +126,6 @@ function renderTabla(productos, rol) {
               return data.replace(/<[^>]*>?/gm, ' ').replace(/\s\s+/g, ' ').trim();
             }
           }
-      },
-      action: function (e, dt, node, config) {
-        $.fn.dataTable.ext.buttons.csvHtml5.action.call(this, e, dt, node, config);
-        setTimeout(() => {
-          document.body.classList.remove('page-exit');
-          const overlay = document.getElementById('page-overlay');
-          if (overlay) overlay.classList.add('hidden');
-        }, 100);
         }
     },
     {

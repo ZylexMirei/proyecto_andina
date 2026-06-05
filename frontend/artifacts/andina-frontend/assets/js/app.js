@@ -442,6 +442,19 @@ function initPage(config = {}) {
   applyRolePermissions();
   if (session && session.rol !== 'Cliente') setTimeout(cargarNotificaciones, 500);
 
+  // --- BOTÓN FLOTANTE DE WHATSAPP (SOLO PARA CLIENTES) ---
+  if (session && session.rol === 'Cliente') {
+    if (!document.getElementById('whatsapp-btn')) {
+      const wa = document.createElement('a');
+      wa.id = 'whatsapp-btn';
+      wa.href = 'https://wa.me/59169713359?text=Hola,%20necesito%20ayuda%20con%20mi%20pedido%20en%20Distribuidora%20Andina';
+      wa.target = '_blank';
+      wa.className = 'whatsapp-float';
+      wa.innerHTML = '<i class="bi bi-whatsapp"></i>';
+      document.body.appendChild(wa);
+    }
+  }
+
   // --- FIX VISUAL GLOBAL: Evitar que la barra superior tape el contenido ---
   if (!document.getElementById('andina-layout-fix')) {
     const s = document.createElement('style');

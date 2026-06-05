@@ -29,12 +29,14 @@
     const href = link.getAttribute('href');
     if (!href) return;
 
-    // Ignorar: anclas, javascript:, target=_blank, externas
+    // Ignorar: anclas, javascript:, target=_blank, descargas, externas
     if (
       href.startsWith('#') ||
       href.startsWith('javascript') ||
       href.startsWith('mailto') ||
       href.startsWith('tel') ||
+      href.startsWith('blob:') ||
+      link.hasAttribute('download') ||
       link.target === '_blank' ||
       link.hasAttribute('data-bs-toggle') ||
       link.hasAttribute('data-bs-dismiss') ||

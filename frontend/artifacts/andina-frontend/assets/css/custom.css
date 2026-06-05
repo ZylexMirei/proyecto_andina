@@ -1130,3 +1130,19 @@ body.page-exit {
   .table tbody td { border: 1px solid #eee !important; color: black !important; }
   .badge { border: 1px solid #ccc !important; color: black !important; background: transparent !important; }
 }
+
+/* ===================== WHATSAPP FLOAT ===================== */
+.whatsapp-float {
+  position: fixed; width: 55px; height: 55px;
+  bottom: 25px; right: 25px;
+  background-color: #25d366; color: #FFF;
+  border-radius: 50%; text-align: center;
+  font-size: 28px; box-shadow: 0 4px 14px rgba(37,211,102,0.4);
+  z-index: 1000; display: flex; align-items: center; justify-content: center;
+  transition: all 0.3s ease; text-decoration: none;
+}
+.whatsapp-float:hover {
+  transform: translateY(-4px) scale(1.08);
+  box-shadow: 0 6px 20px rgba(37,211,102,0.6);
+  color: #fff;
+}
