@@ -5,6 +5,21 @@
 
 let productosData = []; // Guardará los datos reales de MySQL
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }[ch]));
+}
+
+function safeImageUrl(value) {
+  const url = String(value || '').trim();
+  return /^(https?:\/\/|\/|\.{1,2}\/)/i.test(url) ? url : '';
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const session = Andina.initPage({ activeKey:'productos', pageTitle:'Productos' });
   if (!session) return;
@@ -22,10 +37,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       ...p,
       id: p.id_producto,
       precio: p.precio_referencia,
-      imagen: p.imagen_principal,
+      imagen: safeImageUrl(p.imagen_principal || p.imagen),
       stock: p.stock_total || 0,
-      stock_min: 20,
-      stock_max: 2000,
+      stock_min: p.stock_min || 20,
+      stock_max: p.stock_max || 500,
       estado: p.estado || 'Activo',
       categoria: p.categoria || 'Sin categoría'
    
@@ -76,22 +91,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 function renderTabla(productos, rol) {
   const tbody = document.getElementById('tbodyProductos');
   tbody.innerHTML = productos.map(p => {
-    const imgHtml = p.imagen
-      ? `<img src="${p.imagen}" alt="${p.nombre}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;margin-right:10px;">`
-      : `<div style="width:36px;height:36px;border-radius:8px;background:var(--secondary);display:inline-flex;align-items:center;justify-content:center;margin-right:10px;color:var(--primary);font-weight:700;font-size:13px;">${p.nombre.charAt(0)}</div>`;
+    const nombre = escapeHtml(p.nombre);
+    const codigo = escapeHtml(p.codigo);
+    const categoria = escapeHtml(p.categoria);
+    const imagen = safeImageUrl(p.imagen);
+    const imgHtml = imagen
+      ? `<img src="${imagen}" alt="${nombre}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;margin-right:10px;">`
+      : `<div style="width:36px;height:36px;border-radius:8px;background:var(--secondary);display:inline-flex;align-items:center;justify-content:center;margin-right:10px;color:var(--primary);font-weight:700;font-size:13px;">${nombre.charAt(0)}</div>`;
 
     const acciones = `
       <div class="d-flex gap-1">
         <a href="crear.html?id=${p.id}" class="btn btn-outline-primary btn-xs" title="Editar" data-role-manager><i class="bi bi-pencil"></i></a>
         <button class="btn btn-outline-success btn-xs" title="Cambiar Imagen" onclick="cambiarImagenProducto(${p.id})" data-role-manager><i class="bi bi-image"></i></button>
-        <button class="btn btn-outline-danger btn-xs" title="Desactivar" onclick="desactivarProducto(${p.id},'${p.nombre}')" data-role-admin><i class="bi bi-trash3"></i></button>
+        <button class="btn btn-outline-danger btn-xs" title="Desactivar" onclick="desactivarProducto(${p.id})" data-role-admin><i class="bi bi-trash3"></i></button>
         <button class="btn btn-outline-secondary btn-xs" title="Ver detalle" onclick="verDetalle(${p.id})"><i class="bi bi-eye"></i></button>
       </div>`;
 
     return `<tr>
-      <td><code style="font-size:12px;color:var(--primary);">${p.codigo}</code></td>
-      <td><div class="d-flex align-items-center">${imgHtml}<div><div style="font-weight:600;font-size:13px;">${p.nombre}</div></div></div></td>
-      <td><span class="badge" style="${getCategoriaStyle(p.categoria)}">${p.categoria}</span></td>
+      <td><code style="font-size:12px;color:var(--primary);">${codigo}</code></td>
+      <td><div class="d-flex align-items-center">${imgHtml}<div><div style="font-weight:600;font-size:13px;">${nombre}</div></div></div></td>
+      <td><span class="badge" style="${getCategoriaStyle(p.categoria)}">${categoria}</span></td>
       <td><strong>${Andina.formatBs(p.precio)}</strong></td>
       <td>
         <div>${p.stock} uds.</div>
@@ -215,7 +234,11 @@ function cambiarImagenProducto(id) {
     confirmButtonColor: '#00a859'
   }).then(async (result) => {
     if (result.isConfirmed) {
-      const nuevaImg = result.value;
+      const nuevaImg = safeImageUrl(result.value);
+      if (result.value && !nuevaImg) {
+        Andina.showToast('La imagen debe ser una URL válida o una ruta local', 'warning');
+        return;
+      }
       
       const res = await Andina.apiRequest('editar_producto', {
         id_producto: p.id,
@@ -241,7 +264,9 @@ function cambiarImagenProducto(id) {
   });
 }
 
-function desactivarProducto(id, nombre) {
+function desactivarProducto(id) {
+  const producto = productosData.find(x => x.id === id);
+  const nombre = producto ? producto.nombre : 'este producto';
   Swal.fire({
     title: '¿Desactivar producto?',
     html: `El producto <strong>${nombre}</strong> será desactivado y no aparecerá en pedidos ni en la tienda.`,

@@ -144,13 +144,36 @@ document.getElementById('fechaPedido').valueAsDate = new Date();
 
 // Llenar select de clientes
 const selCliente = document.getElementById('cliente');
-Andina.MOCK_DATA.clientes.forEach(c => {
-  const opt = document.createElement('option');
-  opt.value = c.id;
-  opt.textContent = c.razon_social;
-  opt.dataset.tel = c.telefono; opt.dataset.email = c.email; opt.dataset.dir = c.direccion;
-  selCliente.appendChild(opt);
-});
+let clientesData = [];
+let productosData = [];
+
+async function cargarDatosPedido() {
+  const [resClientes, resProductos] = await Promise.all([
+    Andina.apiRequest('listar_clientes', {}, 'GET'),
+    Andina.apiRequest('listar_productos', {}, 'GET')
+  ]);
+
+  clientesData = resClientes?.clientes || [];
+  productosData = (resProductos?.productos || []).map(p => ({
+    id: parseInt(p.id_producto || p.id),
+    codigo: p.codigo || `PROD-${p.id_producto || p.id}`,
+    nombre: p.nombre,
+    precio: parseFloat(p.precio_referencia || p.precio || 0),
+    stock: parseInt(p.stock_total || p.stock || 0),
+    categoria: p.categoria || 'Sin categoria'
+  }));
+
+  selCliente.innerHTML = '<option value="">Seleccionar cliente...</option>';
+  clientesData.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id_cliente || c.id;
+    opt.textContent = c.razon_social;
+    opt.dataset.tel = c.telefono || '';
+    opt.dataset.email = c.email || '';
+    opt.dataset.dir = c.direccion || '';
+    selCliente.appendChild(opt);
+  });
+}
 
 function seleccionarCliente() {
   const opt = selCliente.selectedOptions[0];
@@ -161,9 +184,11 @@ function seleccionarCliente() {
   document.getElementById('infoCliente').classList.remove('d-none');
 }
 
-const productosOpts = Andina.MOCK_DATA.productos.map(p =>
+function getProductosOpts() {
+  return productosData.map(p =>
   `<option value="${p.id}" data-precio="${p.precio}" data-stock="${p.stock}">${p.codigo} — ${p.nombre}</option>`
-).join('');
+  ).join('');
+}
 
 let rowCount = 0;
 const productosEnPedido = [];
@@ -175,7 +200,7 @@ function agregarProducto() {
   tr.id = `row${rowCount}`;
   tr.innerHTML = `
     <td><select class="form-select form-select-sm" onchange="onProductoChange(${rowCount})">
-      <option value="">Seleccionar...</option>${productosOpts}
+      <option value="">Seleccionar...</option>${getProductosOpts()}
     </select></td>
     <td><span id="stock${rowCount}" style="font-size:12px;color:#718096;">—</span></td>
     <td><input type="number" class="form-control form-control-sm" id="cant${rowCount}" value="1" min="1" style="width:70px;" onchange="calcFila(${rowCount})"></td>
@@ -258,6 +283,18 @@ async function confirmarPedido() {
   if(!document.getElementById('cliente').value){ Andina.showToast('Selecciona un cliente','warning'); return; }
   const filas = document.querySelectorAll('#tbodyDetalles tr');
   if(!filas.length){ Andina.showToast('Agrega al menos un producto','warning'); return; }
+  const productos = [...filas].map(tr => {
+    const id = tr.id.replace('row', '');
+    const select = tr.querySelector('select');
+    const opt = select?.selectedOptions[0];
+    return {
+      id_producto: parseInt(select?.value || 0),
+      cantidad: parseInt(document.getElementById(`cant${id}`)?.value || 0),
+      precio: parseFloat(opt?.dataset?.precio || 0)
+    };
+  }).filter(item => item.id_producto > 0 && item.cantidad > 0);
+
+  if(!productos.length){ Andina.showToast('Selecciona productos y cantidades válidas','warning'); return; }
   
   const r = await Swal.fire({
     title:'¿Confirmar pedido?', text:'El pedido será registrado y el stock descontado.',
@@ -265,9 +302,18 @@ async function confirmarPedido() {
   });
   if(!r.isConfirmed) return;
   
-  await Andina.apiRequest('crear_pedido',{ cliente_id: document.getElementById('cliente').value });
-  Andina.showToast('Pedido creado correctamente','success');
-  setTimeout(()=>window.location.href='lista.html',900);
+  const res = await Andina.apiRequest('crear_pedido',{
+    cliente_id: document.getElementById('cliente').value,
+    productos,
+    observaciones: document.getElementById('observaciones').value.trim()
+  });
+
+  if (res && res.exito) {
+    Andina.showToast('Pedido creado correctamente','success');
+    setTimeout(()=>window.location.href='lista.html',900);
+  } else {
+    Andina.showToast(res?.error || 'Error al crear pedido','error');
+  }
 }
 
 function nuevoCliente() {
@@ -277,11 +323,21 @@ function nuevoCliente() {
 async function guardarNuevoCliente() {
   const nombre = document.getElementById('ncNombre').value.trim();
   if(!nombre){ Andina.showToast('El nombre es requerido','warning'); return; }
-  await Andina.apiRequest('crear_cliente',{ razon_social:nombre });
+  const res = await Andina.apiRequest('crear_cliente',{
+    razon_social: nombre,
+    nit_ci: document.getElementById('ncNit').value.trim(),
+    telefono: document.getElementById('ncTel').value.trim(),
+    email: document.getElementById('ncEmail').value.trim(),
+    direccion: document.getElementById('ncDir').value.trim()
+  });
+  if (!res || !res.exito) {
+    Andina.showToast(res?.error || 'Error al crear cliente','error');
+    return;
+  }
   
   // Añadir al select
   const opt = document.createElement('option');
-  opt.value = Date.now(); opt.textContent = nombre;
+  opt.value = res.id_cliente; opt.textContent = nombre;
   opt.dataset.tel = document.getElementById('ncTel').value;
   opt.dataset.email = document.getElementById('ncEmail').value;
   opt.dataset.dir = document.getElementById('ncDir').value;
@@ -292,6 +348,8 @@ async function guardarNuevoCliente() {
   bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();
   Andina.showToast('Cliente creado correctamente','success');
 }
+
+cargarDatosPedido();
 </script>
 <script src="../assets/js/transitions.js"></script>
 </body>

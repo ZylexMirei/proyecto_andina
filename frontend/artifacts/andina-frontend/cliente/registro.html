@@ -85,7 +85,7 @@
         </form>
 
         <div class="text-center mt-4">
-          <p style="font-size:13px;color:#718096;">¿Ya tienes cuenta? <a href="../index.html" class="text-success fw-semibold">Inicia sesión</a></p>
+          <p style="font-size:13px;color:#718096;">¿Ya tienes cuenta? <a href="../login.html" class="text-success fw-semibold">Inicia sesión</a></p>
           <p style="font-size:13px;color:#718096;">¿Eres empleado? <a href="../registro.html" style="color:var(--primary);">Registrarte aquí</a></p>
         </div>
       </div>
@@ -118,13 +118,20 @@ document.getElementById('regClienteForm').addEventListener('submit', async funct
   document.getElementById('rcBtnLoad').classList.remove('d-none');
   document.getElementById('rcBtn').disabled=true;
 
-  await Andina.apiRequest('registro_cliente',{nombre,email,telefono:document.getElementById('rcTel').value,direccion:document.getElementById('rcDir').value,password:pass,id_rol:4});
-  localStorage.setItem('andina_otp_email',email);
-  localStorage.setItem('andina_otp_nombre',nombre);
+  const res = await Andina.apiRequest('registro_cliente',{nombre,email,telefono:document.getElementById('rcTel').value,direccion:document.getElementById('rcDir').value,password:pass,id_rol:4});
 
   document.getElementById('rcBtnTxt').classList.remove('d-none');
   document.getElementById('rcBtnLoad').classList.add('d-none');
   document.getElementById('rcBtn').disabled=false;
+
+  if(!res || res.error || res.exito === false){
+    errEl.textContent = res?.error || res?.mensaje || 'No se pudo crear la cuenta.';
+    errEl.classList.remove('d-none');
+    return;
+  }
+
+  localStorage.setItem('andina_otp_email',email);
+  localStorage.setItem('andina_otp_nombre',nombre);
   Andina.showToast('Cuenta creada. Verifica tu email.','success');
   setTimeout(()=>window.location.href='../verificar.html',1200);
 });

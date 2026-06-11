@@ -1,9 +1,8 @@
 <?php
 /**
- * test_api.php
+ * api.php
  *
- * Archivo de prueba para verificar que la API está funcionando correctamente.
- * Este archivo es SOLO PARA DESARROLLO. No incluir en producción.
+ * Archivo principal (Enrutador) de la API del sistema.
  *
  * Las credenciales reales están en archivo .env
  */
@@ -12,10 +11,14 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Token');
 
 // Manejar solicitudes preflight (OPTIONS) del frontend de forma limpia
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -33,7 +36,242 @@ require_once __DIR__ . '/config/auditoria.php';
 $accion = $_GET['accion'] ?? '';
 $data = json_decode(file_get_contents("php://input"), true) ?: $_POST;
 
+function requireApiAuth($roles_permitidos = []) {
+    verificarAutenticacion();
+
+    $headerToken = $_SERVER['HTTP_X_TOKEN'] ?? '';
+    if ($headerToken !== '' && isset($_SESSION['api_token']) && !hash_equals($_SESSION['api_token'], $headerToken)) {
+        responderJSON(["error" => "Token de sesión inválido"], 401);
+    }
+
+    if (!empty($roles_permitidos)) {
+        verificarRol($roles_permitidos);
+    }
+}
+
+function columnaExiste(PDO $db, $tabla, $columna) {
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $tabla) || !preg_match('/^[a-zA-Z0-9_]+$/', $columna)) {
+        return false;
+    }
+
+    try {
+        $stmt = $db->prepare("SHOW COLUMNS FROM `{$tabla}` LIKE :columna");
+        $stmt->bindValue(':columna', $columna);
+        $stmt->execute();
+        return (bool) $stmt->fetch();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function normalizarImagenProducto($url) {
+    $url = trim((string) $url);
+    if ($url === '') return '';
+
+    if (preg_match('/^(https?:\/\/|\/|\.{1,2}\/)/i', $url) !== 1) {
+        return '';
+    }
+
+    return filter_var($url, FILTER_SANITIZE_URL);
+}
+
+function resolverCategoriaProducto(PDO $db, $categoria) {
+    if (is_numeric($categoria) && intval($categoria) > 0) {
+        return intval($categoria);
+    }
+
+    $nombre = sanitizar_input((string) $categoria);
+    if ($nombre === '') return 0;
+
+    $stmt = $db->prepare("SELECT id_categoria FROM categorias WHERE nombre = :nombre LIMIT 1");
+    $stmt->bindValue(':nombre', $nombre);
+    $stmt->execute();
+    $id = $stmt->fetchColumn();
+    if ($id) return (int) $id;
+
+    $insert = $db->prepare("INSERT INTO categorias (nombre, descripcion) VALUES (:nombre, NULL)");
+    $insert->bindValue(':nombre', $nombre);
+    $insert->execute();
+
+    return (int) $db->lastInsertId();
+}
+
+function obtenerAlmacenProducto(PDO $db, $id_almacen = 0) {
+    if ($id_almacen > 0) return $id_almacen;
+
+    try {
+        $id = $db->query("SELECT id_almacen FROM almacenes ORDER BY id_almacen LIMIT 1")->fetchColumn();
+        return $id ? (int) $id : 0;
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
+function guardarInventarioProducto(PDO $db, $id_producto, $data) {
+    $stock = intval($data['stock'] ?? $data['cantidad_actual'] ?? 0);
+    $stock_min = intval($data['stock_min'] ?? $data['stock_minimo'] ?? 10);
+    $stock_max = intval($data['stock_max'] ?? $data['stock_maximo'] ?? 1000);
+    $id_almacen = obtenerAlmacenProducto($db, intval($data['id_almacen'] ?? 0));
+
+    if ($id_almacen <= 0) return;
+
+    $stmt = $db->prepare("SELECT id_inventario FROM inventario WHERE id_producto = :p AND id_almacen = :a LIMIT 1");
+    $stmt->bindValue(':p', $id_producto, PDO::PARAM_INT);
+    $stmt->bindValue(':a', $id_almacen, PDO::PARAM_INT);
+    $stmt->execute();
+    $id_inventario = $stmt->fetchColumn();
+
+    if ($id_inventario) {
+        $upd = $db->prepare("UPDATE inventario SET cantidad_actual = :stock, stock_minimo = :min, stock_maximo = :max WHERE id_inventario = :id");
+        $upd->bindValue(':id', $id_inventario, PDO::PARAM_INT);
+        $upd->bindValue(':stock', $stock, PDO::PARAM_INT);
+        $upd->bindValue(':min', $stock_min, PDO::PARAM_INT);
+        $upd->bindValue(':max', $stock_max, PDO::PARAM_INT);
+        $upd->execute();
+        return;
+    }
+
+    $ins = $db->prepare("INSERT INTO inventario (id_producto, id_almacen, cantidad_actual, stock_minimo, stock_maximo) VALUES (:p, :a, :stock, :min, :max)");
+    $ins->bindValue(':p', $id_producto, PDO::PARAM_INT);
+    $ins->bindValue(':a', $id_almacen, PDO::PARAM_INT);
+    $ins->bindValue(':stock', $stock, PDO::PARAM_INT);
+    $ins->bindValue(':min', $stock_min, PDO::PARAM_INT);
+    $ins->bindValue(':max', $stock_max, PDO::PARAM_INT);
+    $ins->execute();
+}
+
+function obtenerPrecioProducto(PDO $db, $id_producto) {
+    $stmt = $db->prepare("SELECT precio_referencia FROM productos WHERE id_producto = :id LIMIT 1");
+    $stmt->bindValue(':id', $id_producto, PDO::PARAM_INT);
+    $stmt->execute();
+    return (float) ($stmt->fetchColumn() ?: 0);
+}
+
+function descontarStockPedido(PDO $db, $id_producto, $cantidad) {
+    $stmt = $db->prepare("SELECT id_inventario, cantidad_actual FROM inventario WHERE id_producto = :id ORDER BY cantidad_actual DESC LIMIT 1");
+    $stmt->bindValue(':id', $id_producto, PDO::PARAM_INT);
+    $stmt->execute();
+    $inv = $stmt->fetch();
+
+    if (!$inv) {
+        throw new Exception("El producto ID {$id_producto} no tiene inventario registrado");
+    }
+
+    if ((int) $inv['cantidad_actual'] < $cantidad) {
+        throw new Exception("Stock insuficiente para producto ID {$id_producto}. Disponible: {$inv['cantidad_actual']}");
+    }
+
+    $upd = $db->prepare("UPDATE inventario SET cantidad_actual = cantidad_actual - :cantidad WHERE id_inventario = :id");
+    $upd->bindValue(':cantidad', $cantidad, PDO::PARAM_INT);
+    $upd->bindValue(':id', $inv['id_inventario'], PDO::PARAM_INT);
+    $upd->execute();
+}
+
+function normalizarItemsPedido($items) {
+    if (!is_array($items)) return [];
+
+    $normalizados = [];
+    foreach ($items as $item) {
+        $id_producto = intval($item['id_producto'] ?? $item['producto_id'] ?? $item['id'] ?? 0);
+        $cantidad = intval($item['cantidad'] ?? 0);
+        $precio = floatval($item['precio_unitario'] ?? $item['precio'] ?? 0);
+
+        if ($id_producto > 0 && $cantidad > 0) {
+            $normalizados[] = [
+                'id_producto' => $id_producto,
+                'cantidad' => $cantidad,
+                'precio' => $precio,
+                'nombre' => sanitizar_input($item['nombre'] ?? $item['producto'] ?? "Producto {$id_producto}"),
+            ];
+        }
+    }
+
+    return $normalizados;
+}
+
 switch ($accion) {
+
+    // ==================== REGISTRO CLIENTE ====================
+    case 'registro_cliente':
+        $nombre_completo = sanitizar_input($data['nombre_completo'] ?? $data['nombre'] ?? '');
+        $email = sanitizar_input($data['email'] ?? '');
+        $telefono = sanitizar_input($data['telefono'] ?? '');
+        $direccion = sanitizar_input($data['direccion'] ?? '');
+        $nit_ci = sanitizar_input($data['nit_ci'] ?? '');
+        $password = $data['password'] ?? '';
+        $username_form = sanitizar_input($data['username'] ?? '');
+
+        if (empty($nombre_completo) || empty($email) || empty($password)) {
+            echo json_encode(["error" => "Nombre, correo y contraseña son obligatorios."]); exit();
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            echo json_encode(["error" => "El formato del correo electronico es invalido."]); exit();
+        }
+        if (strlen($password) < 8) {
+            echo json_encode(["error" => "La contraseña debe tener al menos 8 caracteres."]); exit();
+        }
+
+        if ($username_form === '') {
+            $base = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '_', strstr($email, '@', true) ?: 'cliente'));
+            $base = trim($base, '_') ?: 'cliente';
+            $username_form = substr($base, 0, 16);
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+
+            $check = $db->prepare("SELECT id_usuario FROM usuarios WHERE email = :email");
+            $check->bindValue(':email', $email);
+            $check->execute();
+            if ($check->fetch()) {
+                echo json_encode(["error" => "Este correo ya esta registrado"]); exit();
+            }
+
+            $candidate = $username_form;
+            $suffix = 1;
+            while (true) {
+                $checkUser = $db->prepare("SELECT id_usuario FROM usuarios WHERE username = :username");
+                $checkUser->bindValue(':username', $candidate);
+                $checkUser->execute();
+                if (!$checkUser->fetch()) break;
+                $candidate = substr($username_form, 0, 15) . $suffix;
+                $suffix++;
+            }
+            $username_form = $candidate;
+
+            $db->beginTransaction();
+
+            $stmtC = $db->prepare("INSERT INTO clientes (razon_social, nit_ci, telefono, email, direccion) VALUES (:r, :nit, :tel, :email, :dir)");
+            $stmtC->bindValue(':r', $nombre_completo);
+            $stmtC->bindValue(':nit', $nit_ci !== '' ? $nit_ci : null);
+            $stmtC->bindValue(':tel', $telefono !== '' ? $telefono : null);
+            $stmtC->bindValue(':email', $email);
+            $stmtC->bindValue(':dir', $direccion !== '' ? $direccion : null);
+            $stmtC->execute();
+
+            $hash = password_hash($password, PASSWORD_BCRYPT);
+            $stmt = $db->prepare("INSERT INTO usuarios (id_empleado, id_rol, username, password_hash, email) VALUES (NULL, 4, :u, :p, :email)");
+            $stmt->bindValue(':u', $username_form);
+            $stmt->bindValue(':p', $hash);
+            $stmt->bindValue(':email', $email);
+            $stmt->execute();
+            $id_usuario = (int) $db->lastInsertId();
+
+            manejarOTP($db, $id_usuario, $email, 'registro');
+            $db->commit();
+
+            echo json_encode([
+                "exito" => true,
+                "mensaje" => "Cliente registrado. Revisa tu correo para el codigo OTP.",
+                "id_usuario" => $id_usuario,
+                "username" => $username_form,
+                "email" => $email
+            ], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            if (isset($db) && $db->inTransaction()) $db->rollBack();
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
 
     // ==================== REGISTRO ====================
     case 'registro':
@@ -82,8 +320,8 @@ switch ($accion) {
             $nombre = $nombres[0];
             $apellido = $nombres[1] ?? '';
 
-            // 1. Determinar el rol por defecto (4 = Cliente)
-            $id_rol = intval($data['id_rol'] ?? 4);
+            // Registro publico: siempre crea clientes. Los roles internos se crean desde admin_crear_usuario.
+            $id_rol = 4;
             $id_empleado = null;
 
             if ($id_rol == 4) {
@@ -131,6 +369,8 @@ switch ($accion) {
 
     // ==================== ADMIN CREAR USUARIO ====================
     case 'admin_crear_usuario':
+        requireApiAuth(['Administrador']);
+
         $nombre_completo = sanitizar_input($data['nombre_completo'] ?? '');
         $email = sanitizar_input($data['email'] ?? '');
         $username_form = sanitizar_input($data['username'] ?? '');
@@ -205,12 +445,13 @@ switch ($accion) {
 
     // ==================== ACTUALIZAR PERFIL CLIENTE ====================
     case 'actualizar_perfil':
-        verificarAutenticacion();
+        requireApiAuth();
         $id_usuario = $_SESSION['id_usuario'];
         $nombre = sanitizar_input($data['nombre'] ?? '');
         $email = sanitizar_input($data['email'] ?? '');
         $telefono = sanitizar_input($data['telefono'] ?? '');
         $direccion = sanitizar_input($data['direccion'] ?? '');
+        $nit_ci = sanitizar_input($data['nit_ci'] ?? '');
 
         if (empty($nombre) || empty($email)) {
             echo json_encode(["error" => "Nombre y email son requeridos"]); exit();
@@ -228,32 +469,67 @@ switch ($accion) {
                 echo json_encode(["error" => "Este correo ya está registrado por otro usuario"]); exit();
             }
 
+            $db->beginTransaction();
+
             // Actualizar usuario
             $stmt = $db->prepare("UPDATE usuarios SET email = :email WHERE id_usuario = :id");
             $stmt->bindValue(':email', $email);
             $stmt->bindValue(':id', $id_usuario);
             $stmt->execute();
 
-            // Actualizar cliente si existe
-            $stmtCliente = $db->prepare("SELECT id_cliente FROM clientes WHERE email = :email_old LIMIT 1");
-            $stmtCliente->bindValue(':email_old', $_SESSION['email'] ?? '');
+            // Buscar el cliente por el usuario autenticado; si el email cambio, el email anterior ya no es confiable.
+            $stmtCliente = $db->prepare(
+                "SELECT c.id_cliente
+                 FROM usuarios u
+                 LEFT JOIN clientes c ON c.email = u.email OR c.email = :email_actual
+                 WHERE u.id_usuario = :id_usuario
+                 LIMIT 1"
+            );
+            $stmtCliente->bindValue(':email_actual', $_SESSION['email'] ?? $email);
+            $stmtCliente->bindValue(':id_usuario', $id_usuario);
             $stmtCliente->execute();
-            if ($stmtCliente->rowCount() > 0) {
-                $cliente = $stmtCliente->fetch();
-                $updateCliente = $db->prepare("UPDATE clientes SET razon_social = :nombre, telefono = :tel, email = :email, direccion = :dir WHERE id_cliente = :id");
+
+            $cliente = $stmtCliente->fetch();
+            if ($cliente && !empty($cliente['id_cliente'])) {
+                $updateCliente = $db->prepare("UPDATE clientes SET razon_social = :nombre, nit_ci = :nit, telefono = :tel, email = :email, direccion = :dir WHERE id_cliente = :id");
                 $updateCliente->bindValue(':nombre', $nombre);
+                $updateCliente->bindValue(':nit', $nit_ci !== '' ? $nit_ci : null);
                 $updateCliente->bindValue(':tel', $telefono);
                 $updateCliente->bindValue(':email', $email);
                 $updateCliente->bindValue(':dir', $direccion);
                 $updateCliente->bindValue(':id', $cliente['id_cliente']);
                 $updateCliente->execute();
+            } else {
+                $insertCliente = $db->prepare("INSERT INTO clientes (razon_social, nit_ci, telefono, email, direccion, estado) VALUES (:nombre, :nit, :tel, :email, :dir, 'Activo')");
+                $insertCliente->bindValue(':nombre', $nombre);
+                $insertCliente->bindValue(':nit', $nit_ci !== '' ? $nit_ci : null);
+                $insertCliente->bindValue(':tel', $telefono);
+                $insertCliente->bindValue(':email', $email);
+                $insertCliente->bindValue(':dir', $direccion);
+                $insertCliente->execute();
             }
 
             $_SESSION['email'] = $email;
             $_SESSION['nombre'] = $nombre;
+            $_SESSION['telefono'] = $telefono;
+            $_SESSION['direccion'] = $direccion;
+            $_SESSION['nit_ci'] = $nit_ci;
 
-            echo json_encode(["exito" => true, "mensaje" => "Perfil actualizado correctamente"], JSON_UNESCAPED_UNICODE);
+            $db->commit();
+
+            echo json_encode([
+                "exito" => true,
+                "mensaje" => "Perfil actualizado correctamente",
+                "datos" => [
+                    "nombre" => $nombre,
+                    "email" => $email,
+                    "telefono" => $telefono,
+                    "direccion" => $direccion,
+                    "nit_ci" => $nit_ci,
+                ]
+            ], JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
+            if (isset($db) && $db->inTransaction()) $db->rollBack();
             echo json_encode(["error" => $e->getMessage()]);
         }
         break;
@@ -314,7 +590,7 @@ switch ($accion) {
             $db = (new Database())->getConnection();
 
             $stmt = $db->prepare(
-                "SELECT u.*, r.nombre as rol, " .
+                "SELECT u.*, r.nombre as rol, c.telefono as cliente_telefono, c.direccion as cliente_direccion, c.nit_ci as cliente_nit_ci, " .
                 "COALESCE(NULLIF(TRIM(CONCAT_WS(' ', e.nombre, e.apellido)), ''), c.razon_social, u.username) AS nombre_completo " .
                 "FROM usuarios u " .
                 "JOIN roles r ON u.id_rol = r.id_rol " .
@@ -367,8 +643,23 @@ switch ($accion) {
                 "nombre" => $user['nombre_completo'],
                 "rol" => $user['rol'],
                 "email" => $user['email'],
+                "telefono" => $user['cliente_telefono'] ?? '',
+                "direccion" => $user['cliente_direccion'] ?? '',
+                "nit_ci" => $user['cliente_nit_ci'] ?? '',
                 "token" => $token,
             ];
+
+            session_regenerate_id(true);
+            $_SESSION['id_usuario'] = (int) $user['id_usuario'];
+            $_SESSION['id_empleado'] = $datos['id_empleado'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['nombre'] = $user['nombre_completo'];
+            $_SESSION['rol'] = $user['rol'];
+            $_SESSION['email'] = $user['email'];
+            $_SESSION['telefono'] = $datos['telefono'];
+            $_SESSION['direccion'] = $datos['direccion'];
+            $_SESSION['nit_ci'] = $datos['nit_ci'];
+            $_SESSION['api_token'] = $token;
 
             // Guardar en la bitácora de MongoDB silenciosamente
             registrarAuditoria($user['username'], $user['rol'], "Inicio de sesión en el sistema", "Módulo de Seguridad");
@@ -581,14 +872,19 @@ switch ($accion) {
     // ==================== EDITAR PRODUCTO ====================
     case 'editar_producto':
     case 'update_producto':
+        requireApiAuth(['Administrador', 'Gerente']);
+
         $id_producto = intval($data['id_producto'] ?? $data['id'] ?? 0);
         $codigo = sanitizar_input($data['codigo'] ?? '');
         $nombre = sanitizar_input($data['nombre'] ?? '');
         $descripcion = sanitizar_input($data['descripcion'] ?? '');
         $precio = floatval($data['precio_referencia'] ?? $data['precio'] ?? 0);
-        $imagen = sanitizar_input($data['imagen_principal'] ?? $data['imagen'] ?? $data['imagen_url'] ?? $data['url'] ?? '');
-        $id_categoria = intval($data['id_categoria'] ?? $data['categoria'] ?? 0);
+        $imagen = normalizarImagenProducto($data['imagen_principal'] ?? $data['imagen'] ?? $data['imagen_url'] ?? $data['url'] ?? '');
+        $categoria_input = $data['id_categoria'] ?? $data['categoria'] ?? 0;
         $estado = sanitizar_input($data['estado'] ?? '');
+        if ($estado === '' && array_key_exists('activo', $data)) {
+            $estado = $data['activo'] ? 'Activo' : 'Inactivo';
+        }
 
         if ($id_producto <= 0 || empty($nombre)) {
             echo json_encode(["error" => "ID y nombre son obligatorios"]); exit();
@@ -607,6 +903,7 @@ switch ($accion) {
                 }
             }
 
+            $id_categoria = resolverCategoriaProducto($db, $categoria_input);
             $has_cat = false;
             try { $db->query("SELECT id_categoria FROM productos LIMIT 1"); $has_cat = true; } catch (Throwable $e) {}
 
@@ -623,6 +920,10 @@ switch ($accion) {
             $stmt->bindValue(':id', $id_producto);
             $stmt->execute();
 
+            if (array_key_exists('stock', $data) || array_key_exists('stock_min', $data) || array_key_exists('stock_max', $data)) {
+                guardarInventarioProducto($db, $id_producto, $data);
+            }
+
             echo json_encode(["exito" => true, "mensaje" => "Producto actualizado"]);
         } catch (Throwable $e) {
             echo json_encode(["error" => $e->getMessage()]);
@@ -630,14 +931,17 @@ switch ($accion) {
         break;
 
     // ==================== CREAR PRODUCTO ====================
+    case 'crear_producto':
     case 'create_producto':
+        requireApiAuth(['Administrador', 'Gerente']);
+
         $codigo = sanitizar_input($data['codigo'] ?? '');
         $nombre = sanitizar_input($data['nombre'] ?? '');
         $descripcion = sanitizar_input($data['descripcion'] ?? '');
         $precio = floatval($data['precio_referencia'] ?? $data['precio'] ?? 0);
         // Leer las URL de las imágenes desde distintos formatos que envíe el frontend
-        $imagen = sanitizar_input($data['imagen_principal'] ?? $data['imagen'] ?? $data['imagen_url'] ?? $data['url'] ?? '');
-        $id_categoria = intval($data['id_categoria'] ?? 0);
+        $imagen = normalizarImagenProducto($data['imagen_principal'] ?? $data['imagen'] ?? $data['imagen_url'] ?? $data['url'] ?? '');
+        $categoria_input = $data['id_categoria'] ?? $data['categoria'] ?? 0;
 
         if (empty($codigo) || empty($nombre) || $precio <= 0) {
             echo json_encode(["error" => "Codigo, nombre y precio son requeridos"]); exit();
@@ -645,6 +949,10 @@ switch ($accion) {
 
         try {
             $db = (new Database())->getConnection();
+            $id_categoria = resolverCategoriaProducto($db, $categoria_input);
+            if ($id_categoria <= 0) {
+                echo json_encode(["error" => "Categoria requerida"]); exit();
+            }
 
             $check = $db->prepare("SELECT id_producto FROM productos WHERE codigo = :c");
             $check->bindParam(':c', $codigo);
@@ -657,17 +965,74 @@ switch ($accion) {
             $stmt->bindValue(':cod', $codigo);
             $stmt->bindValue(':nom', $nombre);
             $stmt->bindValue(':des', $descripcion !== '' ? $descripcion : null);
-            $stmt->bindValue(':cat', $id_categoria > 0 ? $id_categoria : null, PDO::PARAM_INT);
+            $stmt->bindValue(':cat', $id_categoria, PDO::PARAM_INT);
             $stmt->bindValue(':pre', $precio);
             $stmt->bindValue(':img', $imagen !== '' ? $imagen : null);
             $stmt->execute();
+            $id_producto = (int) $db->lastInsertId();
+
+            guardarInventarioProducto($db, $id_producto, $data);
 
             echo json_encode([
                 "exito" => true,
                 "mensaje" => "Producto creado",
-                "id_producto" => $db->lastInsertId()
+                "id_producto" => $id_producto
             ], JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    // ==================== OBTENER PRODUCTO ====================
+    case 'obtener_producto':
+        requireApiAuth(['Administrador', 'Gerente']);
+
+        $id_producto = intval($_GET['id'] ?? $data['id_producto'] ?? $data['id'] ?? 0);
+        if ($id_producto <= 0) {
+            echo json_encode(["error" => "ID de producto invalido"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $stmt = $db->prepare("SELECT p.*, p.imagen_principal as imagen, c.nombre as categoria,
+                    COALESCE((SELECT SUM(cantidad_actual) FROM inventario WHERE id_producto = p.id_producto), 0) as stock_total,
+                    COALESCE((SELECT stock_minimo FROM inventario WHERE id_producto = p.id_producto ORDER BY id_inventario LIMIT 1), 20) as stock_min,
+                    COALESCE((SELECT stock_maximo FROM inventario WHERE id_producto = p.id_producto ORDER BY id_inventario LIMIT 1), 500) as stock_max
+                FROM productos p
+                LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+                WHERE p.id_producto = :id
+                LIMIT 1");
+            $stmt->bindValue(':id', $id_producto, PDO::PARAM_INT);
+            $stmt->execute();
+            $producto = $stmt->fetch();
+
+            if (!$producto) {
+                echo json_encode(["error" => "Producto no encontrado"], JSON_UNESCAPED_UNICODE); exit();
+            }
+
+            echo json_encode(["exito" => true, "producto" => $producto], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    // ==================== DESACTIVAR PRODUCTO ====================
+    case 'desactivar_producto':
+        requireApiAuth(['Administrador']);
+
+        $id_producto = intval($data['id_producto'] ?? $data['id'] ?? 0);
+        if ($id_producto <= 0) {
+            echo json_encode(["error" => "ID de producto invalido"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $stmt = $db->prepare("UPDATE productos SET estado = 'Inactivo' WHERE id_producto = :id");
+            $stmt->bindValue(':id', $id_producto, PDO::PARAM_INT);
+            $stmt->execute();
+
+            echo json_encode(["exito" => true, "mensaje" => "Producto desactivado"], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
             echo json_encode(["error" => $e->getMessage()]);
         }
         break;
@@ -676,7 +1041,14 @@ switch ($accion) {
     case 'listar_productos':
         try {
             $db = (new Database())->getConnection();
-            $stmt = $db->prepare("SELECT p.*, p.imagen_principal as imagen, c.nombre as categoria, COALESCE((SELECT SUM(cantidad_actual) FROM inventario WHERE id_producto = p.id_producto), 0) as stock_total FROM productos p LEFT JOIN categorias c ON p.id_categoria = c.id_categoria WHERE p.estado = 'Activo' OR p.estado IS NULL OR LOWER(p.estado) = 'activo' ORDER BY p.nombre");
+            $stmt = $db->prepare("SELECT p.*, p.imagen_principal as imagen, c.nombre as categoria,
+                    COALESCE((SELECT SUM(cantidad_actual) FROM inventario WHERE id_producto = p.id_producto), 0) as stock_total,
+                    COALESCE((SELECT stock_minimo FROM inventario WHERE id_producto = p.id_producto ORDER BY id_inventario LIMIT 1), 20) as stock_min,
+                    COALESCE((SELECT stock_maximo FROM inventario WHERE id_producto = p.id_producto ORDER BY id_inventario LIMIT 1), 500) as stock_max
+                FROM productos p
+                LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+                WHERE p.estado = 'Activo' OR p.estado IS NULL OR LOWER(p.estado) = 'activo'
+                ORDER BY p.nombre");
             $stmt->execute();
 
             echo json_encode([
@@ -837,6 +1209,7 @@ switch ($accion) {
         break;
 
     // ==================== CREAR CLIENTE ====================
+    case 'crear_cliente':
     case 'create_cliente':
         $razon_social = sanitizar_input($data['razon_social'] ?? '');
         $nit_ci = sanitizar_input($data['nit_ci'] ?? '');
@@ -936,8 +1309,147 @@ switch ($accion) {
         }
         break;
 
+    // ==================== ELIMINAR CLIENTE ====================
+    case 'eliminar_cliente':
+        requireApiAuth(['Administrador', 'Gerente']);
+
+        $id_cliente = intval($data['id_cliente'] ?? $data['id'] ?? 0);
+        if ($id_cliente <= 0) {
+            echo json_encode(["error" => "ID de cliente invalido"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            if (columnaExiste($db, 'clientes', 'estado')) {
+                $stmt = $db->prepare("UPDATE clientes SET estado = 'Inactivo' WHERE id_cliente = :id");
+            } else {
+                $stmt = $db->prepare("DELETE FROM clientes WHERE id_cliente = :id");
+            }
+            $stmt->bindValue(':id', $id_cliente, PDO::PARAM_INT);
+            $stmt->execute();
+            echo json_encode(["exito" => true, "mensaje" => "Cliente eliminado"], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    // ==================== PROVEEDORES ====================
+    case 'listar_proveedores':
+        requireApiAuth(['Administrador', 'Gerente', 'Empleado']);
+
+        try {
+            $db = (new Database())->getConnection();
+            $where = columnaExiste($db, 'proveedores', 'estado') ? "WHERE estado = 'Activo' OR estado IS NULL" : "";
+            $stmt = $db->prepare("SELECT *, id_proveedor as id FROM proveedores {$where} ORDER BY razon_social ASC");
+            $stmt->execute();
+            echo json_encode(["exito" => true, "proveedores" => $stmt->fetchAll()], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    case 'crear_proveedor':
+    case 'create_proveedor':
+        requireApiAuth(['Administrador', 'Gerente']);
+
+        $razon_social = sanitizar_input($data['razon_social'] ?? $data['nombre'] ?? '');
+        $nit = sanitizar_input($data['nit'] ?? '');
+        $contacto = sanitizar_input($data['contacto'] ?? '');
+        $telefono = sanitizar_input($data['telefono'] ?? '');
+        $email = sanitizar_input($data['email'] ?? '');
+        $direccion = sanitizar_input($data['direccion'] ?? $data['ciudad'] ?? '');
+
+        if ($razon_social === '') {
+            echo json_encode(["error" => "Razon social requerida"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            if ($nit !== '') {
+                $check = $db->prepare("SELECT id_proveedor FROM proveedores WHERE nit = :nit LIMIT 1");
+                $check->bindValue(':nit', $nit);
+                $check->execute();
+                if ($check->fetch()) {
+                    echo json_encode(["error" => "Ya existe un proveedor con ese NIT"]); exit();
+                }
+            }
+
+            $stmt = $db->prepare("INSERT INTO proveedores (razon_social, nit, contacto, telefono, email, direccion) VALUES (:razon, :nit, :contacto, :telefono, :email, :direccion)");
+            $stmt->bindValue(':razon', $razon_social);
+            $stmt->bindValue(':nit', $nit !== '' ? $nit : null);
+            $stmt->bindValue(':contacto', $contacto !== '' ? $contacto : null);
+            $stmt->bindValue(':telefono', $telefono !== '' ? $telefono : null);
+            $stmt->bindValue(':email', $email !== '' ? $email : null);
+            $stmt->bindValue(':direccion', $direccion !== '' ? $direccion : null);
+            $stmt->execute();
+
+            echo json_encode(["exito" => true, "mensaje" => "Proveedor creado", "id_proveedor" => (int) $db->lastInsertId()], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    case 'editar_proveedor':
+    case 'update_proveedor':
+        requireApiAuth(['Administrador', 'Gerente']);
+
+        $id_proveedor = intval($data['id_proveedor'] ?? $data['id'] ?? 0);
+        $razon_social = sanitizar_input($data['razon_social'] ?? $data['nombre'] ?? '');
+        $nit = sanitizar_input($data['nit'] ?? '');
+        $contacto = sanitizar_input($data['contacto'] ?? '');
+        $telefono = sanitizar_input($data['telefono'] ?? '');
+        $email = sanitizar_input($data['email'] ?? '');
+        $direccion = sanitizar_input($data['direccion'] ?? $data['ciudad'] ?? '');
+
+        if ($id_proveedor <= 0 || $razon_social === '') {
+            echo json_encode(["error" => "ID y razon social son requeridos"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $stmt = $db->prepare("UPDATE proveedores SET razon_social = :razon, nit = :nit, contacto = :contacto, telefono = :telefono, email = :email, direccion = :direccion WHERE id_proveedor = :id");
+            $stmt->bindValue(':razon', $razon_social);
+            $stmt->bindValue(':nit', $nit !== '' ? $nit : null);
+            $stmt->bindValue(':contacto', $contacto !== '' ? $contacto : null);
+            $stmt->bindValue(':telefono', $telefono !== '' ? $telefono : null);
+            $stmt->bindValue(':email', $email !== '' ? $email : null);
+            $stmt->bindValue(':direccion', $direccion !== '' ? $direccion : null);
+            $stmt->bindValue(':id', $id_proveedor, PDO::PARAM_INT);
+            $stmt->execute();
+
+            echo json_encode(["exito" => true, "mensaje" => "Proveedor actualizado"], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    case 'eliminar_proveedor':
+        requireApiAuth(['Administrador', 'Gerente']);
+
+        $id_proveedor = intval($data['id_proveedor'] ?? $data['id'] ?? 0);
+        if ($id_proveedor <= 0) {
+            echo json_encode(["error" => "ID de proveedor invalido"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            if (columnaExiste($db, 'proveedores', 'estado')) {
+                $stmt = $db->prepare("UPDATE proveedores SET estado = 'Inactivo' WHERE id_proveedor = :id");
+            } else {
+                $stmt = $db->prepare("DELETE FROM proveedores WHERE id_proveedor = :id");
+            }
+            $stmt->bindValue(':id', $id_proveedor, PDO::PARAM_INT);
+            $stmt->execute();
+            echo json_encode(["exito" => true, "mensaje" => "Proveedor eliminado"], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
     // ==================== EDITAR USUARIO ====================
     case 'editar_usuario':
+        requireApiAuth(['Administrador']);
+
         $id_usuario = intval($data['id_usuario'] ?? $data['id'] ?? 0);
         $nombre_completo = sanitizar_input($data['nombre_completo'] ?? $data['nombre'] ?? '');
         $email = sanitizar_input($data['email'] ?? '');
@@ -1002,6 +1514,8 @@ switch ($accion) {
 
     // ==================== LISTAR USUARIOS ====================
     case 'listar_usuarios':
+        requireApiAuth(['Administrador']);
+
         try {
             $db = (new Database())->getConnection();
             $stmt = $db->prepare(
@@ -1033,6 +1547,8 @@ switch ($accion) {
 
     // ==================== CAMBIAR ROL ====================
     case 'cambiar_rol':
+        requireApiAuth(['Administrador']);
+
         $id = intval($data['id'] ?? 0);
         $rol_nombre = sanitizar_input($data['rol'] ?? '');
 
@@ -1063,6 +1579,8 @@ switch ($accion) {
 
     // ==================== CAMBIAR ESTADO USUARIO ====================
     case 'cambiar_estado_usuario':
+        requireApiAuth(['Administrador']);
+
         $id = intval($data['id'] ?? 0);
         $estado = sanitizar_input($data['estado'] ?? '');
 
@@ -1085,6 +1603,8 @@ switch ($accion) {
 
     // ==================== LISTAR LOGS (BITÁCORA) ====================
     case 'listar_logs':
+        requireApiAuth(['Administrador']);
+
         try {
             $db = (new Database())->getConnection();
             // Obtenemos los últimos 1000 accesos ordenados por el más reciente
@@ -1107,26 +1627,268 @@ switch ($accion) {
         }
         break;
 
+    // ==================== CREAR PEDIDO INTERNO ====================
+    case 'crear_pedido':
+    case 'create_pedido':
+        requireApiAuth(['Administrador', 'Gerente', 'Empleado']);
+
+        $id_cliente = intval($data['id_cliente'] ?? $data['cliente_id'] ?? 0);
+        $items = normalizarItemsPedido($data['productos'] ?? $data['items'] ?? []);
+        $metodo_pago = sanitizar_input($data['metodo_pago'] ?? 'Interno');
+
+        if ($id_cliente <= 0) {
+            echo json_encode(["error" => "Cliente requerido"]); exit();
+        }
+        if (empty($items)) {
+            echo json_encode(["error" => "Agrega al menos un producto al pedido"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $db->beginTransaction();
+
+            $stmtCliente = $db->prepare("SELECT id_cliente FROM clientes WHERE id_cliente = :id LIMIT 1");
+            $stmtCliente->bindValue(':id', $id_cliente, PDO::PARAM_INT);
+            $stmtCliente->execute();
+            if (!$stmtCliente->fetch()) {
+                throw new Exception("Cliente no encontrado");
+            }
+
+            $has_total = false;
+            try { $db->query("SELECT total FROM pedidos LIMIT 1"); $has_total = true; } catch (Throwable $e) {}
+
+            $col_usuario = 'id_usuario';
+            try { $db->query("SELECT id_usuario_creador FROM pedidos LIMIT 1"); $col_usuario = 'id_usuario_creador'; } catch (Throwable $e) {}
+
+            $has_metodo = false;
+            try { $db->query("SELECT metodo_pago FROM pedidos LIMIT 1"); $has_metodo = true; } catch (Throwable $e) {}
+
+            $total = 0;
+            foreach ($items as &$item) {
+                $precio = $item['precio'] > 0 ? $item['precio'] : obtenerPrecioProducto($db, $item['id_producto']);
+                if ($precio <= 0) throw new Exception("Producto ID {$item['id_producto']} no tiene precio valido");
+                descontarStockPedido($db, $item['id_producto'], $item['cantidad']);
+                $item['precio'] = $precio;
+                $total += $precio * $item['cantidad'];
+            }
+            unset($item);
+
+            $codigo = 'PED-' . date('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+            $sql = "INSERT INTO pedidos (codigo_pedido, id_cliente, $col_usuario, fecha_pedido, estado" . ($has_total ? ", total" : "") . ($has_metodo ? ", metodo_pago" : "") . ") VALUES (:cod, :idc, :idu, NOW(), 'Pendiente'" . ($has_total ? ", :tot" : "") . ($has_metodo ? ", :metodo" : "") . ")";
+            $stmt = $db->prepare($sql);
+            $stmt->bindValue(':cod', $codigo);
+            $stmt->bindValue(':idc', $id_cliente, PDO::PARAM_INT);
+            $stmt->bindValue(':idu', $_SESSION['id_usuario'], PDO::PARAM_INT);
+            if ($has_total) $stmt->bindValue(':tot', $total);
+            if ($has_metodo) $stmt->bindValue(':metodo', $metodo_pago);
+            $stmt->execute();
+            $id_pedido = (int) $db->lastInsertId();
+
+            $stmtDet = $db->prepare("INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad, precio_unitario) VALUES (:idp, :idprod, :cant, :pre)");
+            foreach ($items as $item) {
+                $stmtDet->bindValue(':idp', $id_pedido, PDO::PARAM_INT);
+                $stmtDet->bindValue(':idprod', $item['id_producto'], PDO::PARAM_INT);
+                $stmtDet->bindValue(':cant', $item['cantidad'], PDO::PARAM_INT);
+                $stmtDet->bindValue(':pre', $item['precio']);
+                $stmtDet->execute();
+            }
+
+            $db->commit();
+
+            echo json_encode([
+                "exito" => true,
+                "mensaje" => "Pedido creado correctamente",
+                "id_pedido" => $id_pedido,
+                "codigo_pedido" => $codigo,
+                "total" => $total
+            ], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            if (isset($db) && $db->inTransaction()) $db->rollBack();
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
     // ==================== LISTAR PEDIDOS ====================
     case 'listar_pedidos':
+        requireApiAuth(['Administrador', 'Gerente', 'Empleado']);
+
         try {
             $db = (new Database())->getConnection();
             // Usamos LEFT JOIN para que no se oculte ningún pedido aunque falte algún dato
+            $col_usuario = null;
+            if (columnaExiste($db, 'pedidos', 'id_usuario_creador')) {
+                $col_usuario = 'id_usuario_creador';
+            } elseif (columnaExiste($db, 'pedidos', 'id_usuario')) {
+                $col_usuario = 'id_usuario';
+            }
+
+            $usuarioSelect = $col_usuario ? "p.{$col_usuario} as id_usuario" : "NULL as id_usuario";
+            $usuarioJoin = $col_usuario ? "LEFT JOIN usuarios us ON p.{$col_usuario} = us.id_usuario" : "LEFT JOIN usuarios us ON 1 = 0";
+            $limite = max(1, min(1000, intval($_GET['limite'] ?? $data['limite'] ?? 1000)));
+
             $stmt = $db->prepare(
                 "SELECT p.id_pedido as id, p.codigo_pedido as codigo, p.id_cliente,
                         COALESCE(c.razon_social, 'Cliente Eliminado/Desconocido') as cliente,
-                        p.fecha_pedido as fecha, p.estado, p.id_usuario,
-                        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', e.nombre, e.apellido)), ''), us.username, 'Sistema') as creado_por,
+                        p.fecha_pedido as fecha, p.estado, {$usuarioSelect},
+                        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', e.nombre, e.apellido)), ''), c.razon_social, us.username, 'Sistema') as creado_por,
                         COALESCE((SELECT SUM(cantidad * precio_unitario) FROM detalle_pedido WHERE id_pedido = p.id_pedido), 0) as total
                  FROM pedidos p
                  LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
-                 LEFT JOIN usuarios us ON p.id_usuario = us.id_usuario
+                 {$usuarioJoin}
                  LEFT JOIN empleados e ON us.id_empleado = e.id_empleado
-                 ORDER BY p.fecha_pedido DESC LIMIT 1000"
+                 ORDER BY p.fecha_pedido DESC, p.id_pedido DESC LIMIT :limite"
             );
+            $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
             $stmt->execute();
-            echo json_encode(["exito" => true, "pedidos" => $stmt->fetchAll()], JSON_UNESCAPED_UNICODE);
+            $pedidos = $stmt->fetchAll();
+
+            $detStmt = $db->prepare(
+                "SELECT dp.id_producto, dp.cantidad, dp.precio_unitario,
+                        p.codigo as producto_codigo, p.nombre as producto_nombre, p.imagen_principal
+                 FROM detalle_pedido dp
+                 LEFT JOIN productos p ON dp.id_producto = p.id_producto
+                 WHERE dp.id_pedido = :id
+                 ORDER BY dp.id_detalle"
+            );
+
+            foreach ($pedidos as &$pedido) {
+                $detStmt->bindValue(':id', $pedido['id'], PDO::PARAM_INT);
+                $detStmt->execute();
+                $pedido['detalles'] = $detStmt->fetchAll();
+            }
+            unset($pedido);
+
+            echo json_encode(["exito" => true, "pedidos" => $pedidos], JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    // ==================== CAMBIAR ESTADO PEDIDO ====================
+    case 'cambiar_estado_pedido':
+        requireApiAuth(['Administrador', 'Gerente']);
+
+        $id_pedido = intval($data['id_pedido'] ?? $data['id'] ?? 0);
+        $estado = sanitizar_input($data['estado'] ?? '');
+        $permitidos = ['Pendiente', 'Confirmado', 'Enviado', 'Entregado', 'Completado', 'Cancelado'];
+
+        if ($id_pedido <= 0 || !in_array($estado, $permitidos)) {
+            echo json_encode(["error" => "ID o estado invalido"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $stmt = $db->prepare("UPDATE pedidos SET estado = :estado WHERE id_pedido = :id");
+            $stmt->bindValue(':estado', $estado);
+            $stmt->bindValue(':id', $id_pedido, PDO::PARAM_INT);
+            $stmt->execute();
+
+            echo json_encode(["exito" => true, "mensaje" => "Estado actualizado"], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    // ==================== CANCELAR PEDIDO ====================
+    case 'cancelar_pedido':
+        requireApiAuth(['Administrador', 'Gerente']);
+
+        $id_pedido = intval($data['id_pedido'] ?? $data['id'] ?? 0);
+        if ($id_pedido <= 0) {
+            echo json_encode(["error" => "ID de pedido invalido"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $stmt = $db->prepare("UPDATE pedidos SET estado = 'Cancelado' WHERE id_pedido = :id");
+            $stmt->bindValue(':id', $id_pedido, PDO::PARAM_INT);
+            $stmt->execute();
+
+            echo json_encode(["exito" => true, "mensaje" => "Pedido cancelado"], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    // ==================== COMPRAS ====================
+    case 'crear_orden_compra':
+        requireApiAuth(['Administrador', 'Gerente']);
+
+        $id_proveedor = intval($data['id_proveedor'] ?? $data['proveedor_id'] ?? 0);
+        $productos = is_array($data['productos'] ?? null) ? $data['productos'] : [];
+        $observacion = sanitizar_input($data['observacion'] ?? $data['observaciones'] ?? '');
+
+        if ($id_proveedor <= 0) {
+            echo json_encode(["error" => "Proveedor requerido"]); exit();
+        }
+        if (empty($productos)) {
+            echo json_encode(["error" => "Debe agregar al menos un producto"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $db->beginTransaction();
+
+            $provStmt = $db->prepare("SELECT id_proveedor FROM proveedores WHERE id_proveedor = :id LIMIT 1");
+            $provStmt->bindValue(':id', $id_proveedor, PDO::PARAM_INT);
+            $provStmt->execute();
+            if (!$provStmt->fetch()) {
+                throw new Exception("Proveedor no encontrado");
+            }
+
+            $codigo_orden = 'OC-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -6));
+            $stmtOrden = $db->prepare("INSERT INTO ordenes_compra (codigo_orden, id_proveedor, id_usuario_creador, fecha_orden, estado, observacion) VALUES (:codigo, :proveedor, :usuario, CURDATE(), 'Pendiente', :obs)");
+            $stmtOrden->bindValue(':codigo', $codigo_orden);
+            $stmtOrden->bindValue(':proveedor', $id_proveedor, PDO::PARAM_INT);
+            $stmtOrden->bindValue(':usuario', $_SESSION['id_usuario'], PDO::PARAM_INT);
+            $stmtOrden->bindValue(':obs', $observacion !== '' ? $observacion : null);
+            $stmtOrden->execute();
+            $id_orden = (int) $db->lastInsertId();
+
+            $stmtDetalle = $db->prepare("INSERT INTO detalle_orden_compra (id_orden_compra, id_producto, cantidad, precio_unitario) VALUES (:orden, :producto, :cantidad, :precio)");
+            foreach ($productos as $prod) {
+                $id_producto = intval($prod['id_producto'] ?? $prod['producto_id'] ?? $prod['id'] ?? 0);
+                $cantidad = intval($prod['cantidad'] ?? 0);
+                $precio = floatval($prod['precio_unitario'] ?? $prod['precio'] ?? 0);
+                if ($id_producto <= 0 || $cantidad <= 0 || $precio <= 0) {
+                    throw new Exception("Producto, cantidad y precio son requeridos en cada detalle");
+                }
+                $stmtDetalle->bindValue(':orden', $id_orden, PDO::PARAM_INT);
+                $stmtDetalle->bindValue(':producto', $id_producto, PDO::PARAM_INT);
+                $stmtDetalle->bindValue(':cantidad', $cantidad, PDO::PARAM_INT);
+                $stmtDetalle->bindValue(':precio', $precio);
+                $stmtDetalle->execute();
+            }
+
+            $db->commit();
+            echo json_encode(["exito" => true, "mensaje" => "Orden creada", "id_orden" => $id_orden, "codigo_orden" => $codigo_orden], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            if (isset($db) && $db->inTransaction()) $db->rollBack();
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    case 'cambiar_estado_compra':
+        requireApiAuth(['Administrador', 'Gerente']);
+
+        $id_orden = intval($data['id_orden'] ?? $data['id'] ?? 0);
+        $estado = sanitizar_input($data['estado'] ?? '');
+        $mapEstado = ['Recibido' => 'Recibida'];
+        $estadoDb = $mapEstado[$estado] ?? $estado;
+        $permitidos = ['Pendiente', 'Aprobado', 'Rechazado', 'Recibida'];
+
+        if ($id_orden <= 0 || !in_array($estadoDb, $permitidos)) {
+            echo json_encode(["error" => "ID o estado de compra invalido"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $stmt = $db->prepare("UPDATE ordenes_compra SET estado = :estado WHERE id_orden_compra = :id");
+            $stmt->bindValue(':estado', $estadoDb);
+            $stmt->bindValue(':id', $id_orden, PDO::PARAM_INT);
+            $stmt->execute();
+            echo json_encode(["exito" => true, "mensaje" => "Estado de compra actualizado"], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
             echo json_encode(["error" => $e->getMessage()]);
         }
         break;
@@ -1233,6 +1995,8 @@ switch ($accion) {
 
     // ==================== CREAR ALMACÉN ====================
     case 'create_almacen':
+        requireApiAuth(['Administrador', 'Gerente']);
+
         $nombre = sanitizar_input($data['nombre'] ?? '');
         $direccion = sanitizar_input($data['direccion'] ?? '');
 
@@ -1259,6 +2023,13 @@ switch ($accion) {
 
     // ==================== LOGOUT ====================
     case 'logout':
+        $_SESSION = [];
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
+        }
+        session_destroy();
+
         echo json_encode([
             "exito" => true,
             "mensaje" => "Sesión cerrada correctamente"
@@ -1282,7 +2053,9 @@ switch ($accion) {
 
     // ==================== OBTENER PEDIDOS CLIENTE ====================
     case 'obtener_pedidos_cliente':
-        $id_usuario = intval($_GET['id_usuario'] ?? $data['id_usuario'] ?? 0);
+        requireApiAuth(['Cliente']);
+
+        $id_usuario = (int) $_SESSION['id_usuario'];
         try {
             $db = (new Database())->getConnection();
 
@@ -1337,10 +2110,16 @@ switch ($accion) {
 
     // ==================== CREAR PEDIDO CLIENTE ====================
     case 'crear_pedido_cliente':
-        $id_usuario = intval($_GET['id_usuario'] ?? $data['id_usuario'] ?? 0);
-        $items = $data['items'] ?? [];
+        requireApiAuth(['Cliente']);
+
+        $id_usuario = (int) $_SESSION['id_usuario'];
+        $items = normalizarItemsPedido($data['items'] ?? []);
         $total = floatval($data['total'] ?? 0);
         $metodo_pago = sanitizar_input($data['metodo_pago'] ?? 'Efectivo');
+
+        if (empty($items)) {
+            echo json_encode(["error" => "Agrega al menos un producto al pedido"]); exit();
+        }
 
         try {
             $db = (new Database())->getConnection();
@@ -1388,6 +2167,16 @@ switch ($accion) {
             $has_metodo = false;
             try { $db->query("SELECT metodo_pago FROM pedidos LIMIT 1"); $has_metodo = true; } catch (Throwable $e) {}
 
+            $total = 0;
+            foreach ($items as &$item) {
+                $precio = $item['precio'] > 0 ? $item['precio'] : obtenerPrecioProducto($db, $item['id_producto']);
+                if ($precio <= 0) throw new Exception("Producto ID {$item['id_producto']} no tiene precio valido");
+                descontarStockPedido($db, $item['id_producto'], $item['cantidad']);
+                $item['precio'] = $precio;
+                $total += $precio * $item['cantidad'];
+            }
+            unset($item);
+
             $sql = "INSERT INTO pedidos (codigo_pedido, id_cliente, $col_usuario, fecha_pedido, estado" . ($has_total ? ", total" : "") . ($has_metodo ? ", metodo_pago" : "") . ") VALUES (:cod, :idc, :idu, NOW(), 'Pendiente'" . ($has_total ? ", :tot" : "") . ($has_metodo ? ", :metodo" : "") . ")";
 
             $codigo = 'PED-' . date('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
@@ -1408,7 +2197,7 @@ switch ($accion) {
             $stmtDet = $db->prepare("INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad, precio_unitario) VALUES (:idp, :idprod, :cant, :pre)");
             foreach ($items as $item) {
                 $stmtDet->bindValue(':idp', $id_pedido);
-                $stmtDet->bindValue(':idprod', $item['id']);
+                $stmtDet->bindValue(':idprod', $item['id_producto']);
                 $stmtDet->bindValue(':cant', $item['cantidad']);
                 $stmtDet->bindValue(':pre', $item['precio']);
                 $stmtDet->execute();

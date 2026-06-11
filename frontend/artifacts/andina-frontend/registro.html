@@ -23,7 +23,7 @@
 <body>
 <div class="auth-wrapper" style="align-items:flex-start;padding-top:40px;padding-bottom:40px;">
   <div class="auth-card">
-    <a href="index.html" class="d-flex align-items-center gap-2 mb-4 text-decoration-none" style="color:#718096;font-size:13px;">
+    <a href="login.html" class="d-flex align-items-center gap-2 mb-4 text-decoration-none" style="color:#718096;font-size:13px;">
       <i class="bi bi-arrow-left"></i> Volver al inicio de sesión
     </a>
     <div class="auth-logo" style="width:52px;height:52px;font-size:20px;">DA</div>
@@ -80,7 +80,7 @@
       </button>
     </form>
 
-    <p class="text-center mt-3" style="font-size:13px;color:#718096;">¿Ya tienes cuenta? <a href="index.html" class="text-primary fw-semibold">Inicia sesión</a></p>
+    <p class="text-center mt-3" style="font-size:13px;color:#718096;">¿Ya tienes cuenta? <a href="login.html" class="text-primary fw-semibold">Inicia sesión</a></p>
   </div>
 </div>
 
@@ -134,7 +134,7 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
   document.getElementById('regBtn').disabled=false;
 
   if(res._offline){
-    errEl.textContent='No hay conexión con PHP. Abre otra terminal: php -S 127.0.0.1:8080 -t la carpeta del proyecto, y usa npm run dev para el front.';
+    errEl.textContent='❌ No hay conexión con Apache/WAMP. Verifica que WAMP está corriendo (ícono verde en bandeja del sistema). Si no, ejecuta start-simple.bat en la carpeta del proyecto.';
     errEl.classList.remove('d-none');
     return;
   }

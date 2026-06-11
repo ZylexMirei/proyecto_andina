@@ -13,7 +13,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   const resPed = await Andina.apiRequest('listar_pedidos', {}, 'GET');
   
   if (resProd.exito && resProd.productos) Andina.MOCK_DATA.productos = resProd.productos.map(p => ({...p, id: p.id_producto, precio: p.precio_referencia, stock: p.stock_total || 0, stock_min: 20, stock_max: 2000, estado: p.estado || 'Activo'}));
-  if (resPed.exito && resPed.pedidos) Andina.MOCK_DATA.pedidos = resPed.pedidos.map(p => ({...p, total: parseFloat(p.total) || 0}));
+  if (resPed.exito && resPed.pedidos) {
+    const pedidosReales = resPed.pedidos.map(p => ({
+      ...p,
+      id: parseInt(p.id_pedido || p.id),
+      codigo: p.codigo_pedido || p.codigo,
+      cliente: p.cliente_nombre || p.cliente,
+      fecha: p.fecha_pedido || p.fecha,
+      estado: p.estado,
+      total: parseFloat(p.total_pedido || p.total) || 0,
+      creado_por: p.creador_nombre || p.creado_por,
+      id_usuario: parseInt(p.id_usuario_creador || p.id_usuario)
+    }));
+    const codigosReales = new Set(pedidosReales.map(p => p.codigo));
+    const pedidosSimuladosFiltrados = Andina.MOCK_DATA.pedidos.filter(p => !codigosReales.has(p.codigo));
+    Andina.MOCK_DATA.pedidos = [...pedidosReales, ...pedidosSimuladosFiltrados];
+  }
 
   buildDashboard(session.rol, session);
 });

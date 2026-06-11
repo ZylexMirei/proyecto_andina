@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import fs from "fs";
 import path from "path";
 
 const rawPort = process.env.PORT || "3000";
@@ -10,17 +11,34 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const basePath = process.env.BASE_PATH || "/";
+const projectRoot = path.resolve(import.meta.dirname);
+const buildOutDir = path.resolve(projectRoot, "dist/public");
+
+function copyLegacyAssets() {
+  return {
+    name: "copy-legacy-assets",
+    closeBundle() {
+      const source = path.resolve(projectRoot, "assets");
+      const target = path.resolve(buildOutDir, "assets");
+      if (fs.existsSync(source)) {
+        fs.cpSync(source, target, { recursive: true });
+      }
+    },
+  };
+}
 
 export default defineConfig({
   base: basePath,
-  root: path.resolve(import.meta.dirname),
+  root: projectRoot,
   publicDir: false,
+  plugins: [copyLegacyAssets()],
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: buildOutDir,
     emptyOutDir: true,
     rollupOptions: {
       input: {
         index: path.resolve(import.meta.dirname, "index.html"),
+        login: path.resolve(import.meta.dirname, "login.html"),
         registro: path.resolve(import.meta.dirname, "registro.html"),
         verificar: path.resolve(import.meta.dirname, "verificar.html"),
         dashboard: path.resolve(import.meta.dirname, "dashboard.html"),
@@ -50,15 +68,23 @@ export default defineConfig({
     host: "0.0.0.0",
     allowedHosts: true,
     proxy: {
-      // Redirige CUALQUIER petición que empiece con /backend/ al servidor PHP
-      "/backend": {
-        target: process.env.VITE_PHP_ORIGIN ?? "http://127.0.0.1/proyecto_andina",
+      // Redirige peticiones a /test_api.php al servidor PHP (WAMP/Apache)
+      "^/test_api\\.php": {
+        target: "http://localhost/proyecto_andina",
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path,
       },
-      // Redirige la petición específica a /test_api.php al servidor PHP
-      "/test_api.php": {
-        target: process.env.VITE_PHP_ORIGIN ?? "http://127.0.0.1/proyecto_andina",
+      // Redirige peticiones a /backend/ al servidor PHP
+      "^/backend": {
+        target: "http://localhost/proyecto_andina",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/backend/, ""),
+      },
+      // Fallback si VITE_PHP_ORIGIN está definida (variable de entorno)
+      "^/api": {
+        target: process.env.VITE_PHP_ORIGIN ?? "http://localhost/proyecto_andina",
         changeOrigin: true,
         secure: false,
       },

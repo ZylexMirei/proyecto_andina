@@ -1,0 +1,113 @@
+╔═══════════════════════════════════════════════════════════════════╗
+║              ✓ PROBLEMA ARREGLADO                                ║
+║         El Backend Ahora Debería Funcionar Correctamente          ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+
+🔧 QUÉ SE ARREGLÓ:
+═══════════════════════════════════════════════════════════════════
+
+  El archivo /test_api.php estaba apuntando a la ruta INCORRECTA:
+  
+  ❌ Antes: require_once __DIR__ . '/backend/api.php';
+  ✓ Ahora:  require_once __DIR__ . '/backend/test_api.php';
+  
+  Esto era lo que causaba el error:
+  "No hay conexión con la API PHP"
+
+
+🚀 QUÉ DEBES HACER AHORA:
+═══════════════════════════════════════════════════════════════════
+
+  1. ABRE LA CARPETA DEL PROYECTO:
+     c:\wamp64\www\proyecto_andina
+  
+  2. EJECUTA UNO DE ESTOS SCRIPTS:
+     
+     OPCIÓN A (Recomendada):
+     └─ Doble-clic en: start-simple.bat
+     
+     OPCIÓN B (Con verificación):
+     └─ Doble-clic en: start-smart.bat
+     
+     OPCIÓN C (Con diagnóstico primero):
+     └─ Doble-clic en: diagnose.bat
+     └─ Luego: start-simple.bat
+  
+  3. ESPERA A QUE TODO INICIE (10-15 segundos)
+  
+  4. EL NAVEGADOR SE ABRIRÁ AUTOMÁTICAMENTE EN:
+     http://localhost:3000
+  
+  5. INTENTA HACER LOGIN CON:
+     Usuario: admin
+     Contraseña: (intenta o usa credenciales de BD)
+
+
+📋 SI AÚNVES ERRORES:
+═══════════════════════════════════════════════════════════════════
+
+  Error: "❌ No hay conexión con Apache/WAMP"
+  ────────────────────────────────────────────
+  → WAMP no está corriendo
+  
+  Soluciones:
+  1. Verifica que WAMP está instalado en: C:\wamp64
+  2. Ejecuta el script diagnose.bat para verificar
+  3. Si WAMP no está instalado:
+     - Descarga desde: https://wampserver.com
+     - Instala en C:\wamp64
+     - Reinicia tu computadora
+     - Vuelve a ejecutar start-simple.bat
+
+
+  Error: "npm: command not found"
+  ───────────────────────────────
+  → Node.js no está instalado
+  
+  Soluciones:
+  1. Descarga Node.js desde: https://nodejs.org
+  2. Instala la versión LTS (recomendada)
+  3. Reinicia la terminal
+  4. Vuelve a ejecutar start-simple.bat
+
+
+  Error: "ERR_CONNECTION_REFUSED"
+  ───────────────────────────────
+  → Puerto 3000 está ocupado o WAMP tarda en iniciar
+  
+  Soluciones:
+  1. Cierra todas las terminales
+  2. Cierra WAMP completamente
+  3. Espera 10 segundos
+  4. Ejecuta nuevamente start-simple.bat
+  5. Si persiste, cambia el puerto:
+     set PORT=3001
+     npm run dev
+
+
+🎯 PRÓXIMOS PASOS:
+═══════════════════════════════════════════════════════════════════
+
+  1. Ejecuta: start-simple.bat
+  2. Espera a que se abra el navegador
+  3. Prueba hacer login
+  4. Si funciona: ¡A TRABAJAR! 🚀
+  5. Si no funciona: Revisa TROUBLESHOOTING.md
+
+
+🆘 ¿AÚN NECESITAS AYUDA?
+═══════════════════════════════════════════════════════════════════
+
+  Leea estos archivos en este orden:
+  
+  1. QUICK_START.txt        ← Guía visual rápida
+  2. STARTUP_GUIDE.md       ← Guía completa
+  3. TROUBLESHOOTING.md     ← Solución de problemas
+  4. README.md              ← Documentación del proyecto
+
+
+═══════════════════════════════════════════════════════════════════
+                    ¡Ahora debería funcionar!
+                   Doble-clic en: start-simple.bat
+═══════════════════════════════════════════════════════════════════

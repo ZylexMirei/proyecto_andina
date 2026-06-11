@@ -52,7 +52,7 @@
       <button id="reenviarBtn" class="btn btn-link p-0" style="font-size:13px;" onclick="reenviar()">Reenviar código</button>
     </p>
 
-    <a href="index.html" class="d-block mt-3" style="font-size:13px;color:#718096;">
+    <a href="login.html" class="d-block mt-3" style="font-size:13px;color:#718096;">
       <i class="bi bi-arrow-left me-1"></i>Volver al inicio de sesión
     </a>
   </div>
@@ -127,7 +127,7 @@ async function verificarCodigo(){
       await Swal.fire({title:'¡Contraseña actualizada!',text:'Ya puedes iniciar sesión con tu nueva contraseña.',icon:'success',confirmButtonText:'Ir al inicio de sesión'});
       localStorage.removeItem('andina_otp_email');
       localStorage.removeItem('andina_otp_flow');
-      window.location.href='index.html';
+      window.location.href='login.html';
     } else {
       errEl.textContent=res.error || 'Error al actualizar contraseña.';
       errEl.classList.remove('d-none');
@@ -147,7 +147,7 @@ async function verificarCodigo(){
       await Swal.fire({title:'¡Cuenta verificada!',text:'Tu cuenta ha sido activada correctamente.',icon:'success',confirmButtonText:'Ir al inicio de sesión'});
       localStorage.removeItem('andina_otp_email');
       localStorage.removeItem('andina_otp_nombre');
-      window.location.href='index.html';
+      window.location.href='login.html';
     } else {
       errEl.textContent=res.error || 'Código incorrecto. Verifica e intenta de nuevo.';
       errEl.classList.remove('d-none');

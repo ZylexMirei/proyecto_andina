@@ -76,29 +76,6 @@
         linear-gradient(90deg, rgba(7,17,31,.98) 0%, rgba(7,17,31,.82) 46%, rgba(7,17,31,.30) 100%),
         url("assets/img/landing-warehouse-hero.png") center right/cover no-repeat;
     }
-    .motion-lines {
-      position: absolute;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-      overflow: hidden;
-    }
-    .motion-lines span {
-      position: absolute;
-      left: -18%;
-      width: 38%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(141,255,189,.55), rgba(0,163,255,.42), transparent);
-      opacity: .52;
-      animation: laneMove 8s linear infinite;
-    }
-    .motion-lines span:nth-child(1) { top: 24%; animation-delay: 0s; }
-    .motion-lines span:nth-child(2) { top: 43%; animation-delay: 2.4s; animation-duration: 10s; }
-    .motion-lines span:nth-child(3) { top: 68%; animation-delay: 4.8s; animation-duration: 12s; }
-    @keyframes laneMove {
-      from { transform: translateX(0); }
-      to { transform: translateX(330%); }
-    }
     .hero::after {
       content: "";
       position: absolute;
@@ -128,11 +105,6 @@
       letter-spacing: 0;
       max-width: 850px;
       margin: 0 0 22px;
-      animation: titleEnter .85s cubic-bezier(.2,.8,.2,1) both;
-    }
-    @keyframes titleEnter {
-      from { opacity: 0; transform: translateY(24px); filter: blur(8px); }
-      to { opacity: 1; transform: translateY(0); filter: blur(0); }
     }
     .lead {
       color: #cbd5e1;
@@ -273,27 +245,22 @@
           <a class="nav-link" href="#contacto">Contacto</a>
         </div>
         <div class="d-flex gap-2 top-actions">
-          <a class="btn-ghost" href="login.html">Acceder</a>
-          <a class="btn-andina" href="registro.html">Crear cuenta</a>
+          <a class="btn-ghost" href="frontend/artifacts/andina-frontend/index.html">Acceder</a>
+          <a class="btn-andina" href="frontend/artifacts/andina-frontend/registro.html">Crear cuenta</a>
         </div>
       </div>
     </div>
   </nav>
 
   <header class="hero">
-    <div class="motion-lines" aria-hidden="true">
-      <span></span>
-      <span></span>
-      <span></span>
-    </div>
     <div class="container hero-inner">
       <span class="eyebrow"><i class="bi bi-truck"></i> Entrega mayorista para negocios en Bolivia</span>
       <h1>Distribuidora Andina SRL</h1>
       <p class="lead">Compra productos para tu tienda, revisa disponibilidad real y gestiona pedidos con una plataforma conectada al inventario del ERP.</p>
       <div class="d-flex flex-wrap gap-2">
-        <a class="btn-andina" href="cliente/registro.html"><i class="bi bi-person-plus me-1"></i> Registrarme como cliente</a>
+        <a class="btn-andina" href="frontend/artifacts/andina-frontend/cliente/registro.html"><i class="bi bi-person-plus me-1"></i> Registrarme como cliente</a>
         <a class="btn-ghost" href="#catalogo"><i class="bi bi-bag me-1"></i> Ver productos</a>
-        <a class="btn-ghost" href="login.html"><i class="bi bi-box-arrow-in-right me-1"></i> Iniciar sesion</a>
+        <a class="btn-ghost" href="frontend/artifacts/andina-frontend/index.html"><i class="bi bi-box-arrow-in-right me-1"></i> Iniciar sesion</a>
       </div>
     </div>
   </header>
@@ -360,7 +327,7 @@
           </div>
         </div>
         <div class="text-center mt-4">
-          <a class="btn-andina" href="cliente/registro.html">Comprar desde la tienda</a>
+          <a class="btn-andina" href="frontend/artifacts/andina-frontend/cliente/registro.html">Comprar desde la tienda</a>
         </div>
       </div>
     </div>
@@ -374,7 +341,7 @@
           <p class="section-copy mb-0">Registrate, arma tu carrito y controla tus pedidos desde la plataforma de Distribuidora Andina.</p>
         </div>
         <div class="col-lg-4 text-lg-end">
-          <a class="btn-andina" href="cliente/registro.html">Empezar ahora</a>
+          <a class="btn-andina" href="frontend/artifacts/andina-frontend/cliente/registro.html">Empezar ahora</a>
         </div>
       </div>
     </div>

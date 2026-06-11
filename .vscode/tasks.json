@@ -1,0 +1,71 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "🚀 Iniciar Desarrollo Completo (Frontend + Backend WAMP)",
+      "detail": "Inicia WAMP y el servidor Vite del frontend",
+      "dependsOn": ["🔗 Iniciar WAMP", "🎨 Iniciar Frontend Vite"],
+      "dependsOrder": "sequence",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "🔗 Iniciar WAMP",
+      "type": "shell",
+      "command": "cmd",
+      "args": ["/c", "C:\\wamp64\\wampmanager.exe"],
+      "isBackground": true,
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🎨 Iniciar Frontend Vite",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "dev"],
+      "cwd": "${workspaceFolder}/frontend/artifacts/andina-frontend",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "new"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "📦 Instalar Dependencias (npm)",
+      "type": "shell",
+      "command": "npm",
+      "args": ["install"],
+      "cwd": "${workspaceFolder}/frontend/artifacts/andina-frontend",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true
+      }
+    },
+    {
+      "label": "🏗️  Build Frontend (Vite)",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "build"],
+      "cwd": "${workspaceFolder}/frontend/artifacts/andina-frontend",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true
+      }
+    }
+  ]
+}

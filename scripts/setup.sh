@@ -6,6 +6,8 @@
 set -e
 
 # Este script prepara el proyecto para desarrollo
+PROJECT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_PATH"
 
 echo ""
 echo "========================================"
@@ -50,7 +52,7 @@ echo "   - DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD"
 echo "   - MAIL_HOST, MAIL_PORT, MAIL_USERNAME y MAIL_PASSWORD de tu proveedor de correo"
 echo ""
 echo "2. Verifica la configuracion visitando:"
-echo "   http://localhost/proyecto_andina/verify_setup.php"
+echo "   http://localhost/proyecto_andina/"
 echo ""
 echo "3. Crea la base de datos:"
 echo "   - (Con phpMyAdmin) Entra a http://localhost/phpmyadmin e importa schema.sql"

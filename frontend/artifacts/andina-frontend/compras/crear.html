@@ -171,8 +171,17 @@ function calcTotales() {
 async function guardarOrden() {
   const prov = document.getElementById('proveedor').value;
   if(!prov){ Andina.showToast('Selecciona un proveedor','warning'); return; }
-  const filas = document.querySelectorAll('#tbodyProductos tr');
-  if(filas.length===0){ Andina.showToast('Agrega al menos un producto','warning'); return; }
+  const productos = Array.from(document.querySelectorAll('#tbodyProductos tr'))
+    .map(tr => {
+      const select = tr.querySelector('select');
+      const id_producto = parseInt(select?.value || 0);
+      const cantidad = parseInt(tr.querySelector('input[id^="cant"]')?.value || 0);
+      const precio_unitario = parseFloat(tr.querySelector('input[id^="precio"]')?.value || 0);
+      return { id_producto, cantidad, precio_unitario };
+    })
+    .filter(p => p.id_producto > 0 && p.cantidad > 0 && p.precio_unitario > 0);
+
+  if(productos.length===0){ Andina.showToast('Agrega al menos un producto valido','warning'); return; }
   
   const r = await Swal.fire({
     title:'¿Crear orden de compra?',
@@ -181,7 +190,16 @@ async function guardarOrden() {
   });
   if(!r.isConfirmed) return;
   
-  await Andina.apiRequest('crear_orden_compra',{proveedor_id:prov});
+  const res = await Andina.apiRequest('crear_orden_compra',{
+    id_proveedor: prov,
+    proveedor_id: prov,
+    productos,
+    observacion: document.getElementById('observaciones')?.value || ''
+  });
+  if(res.error || res.exito === false){
+    Andina.showToast(res.error || res.mensaje || 'No se pudo crear la orden', 'error');
+    return;
+  }
   Andina.showToast('Orden de compra creada correctamente','success');
   setTimeout(()=>window.location.href='lista.html',900);
 }

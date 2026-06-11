@@ -76,7 +76,7 @@ function clearSession() {
 function requireAuth(redirect = true) {
   const session = getSession();
   if (!session) {
-    if (redirect) window.location.href = getRoot() + 'index.html';
+    if (redirect) window.location.href = getRoot() + 'login.html';
     return null;
   }
   if (session.rol === 'Cliente') {
@@ -89,7 +89,7 @@ function requireAuth(redirect = true) {
 function requireClienteAuth() {
   const session = getSession();
   if (!session) {
-    window.location.href = getRoot() + 'index.html';
+    window.location.href = getRoot() + 'login.html';
     return null;
   }
   if (session.rol !== 'Cliente') {
@@ -290,10 +290,11 @@ function logout() {
     confirmButtonText: 'Sí, salir',
     cancelButtonText: 'Cancelar',
     reverseButtons: true,
-  }).then(result => {
+  }).then(async result => {
     if (result.isConfirmed) {
+      await apiRequest('logout', {}, 'POST');
       clearSession();
-      window.location.href = getRoot() + 'index.html';
+      window.location.href = getRoot() + 'login.html';
     }
   });
 }

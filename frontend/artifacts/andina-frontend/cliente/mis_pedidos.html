@@ -248,6 +248,7 @@ function cancelar(id) {
 
 function verFactura(id) {
   const p = pedidosCliente.find(x=>x.id===id);
+  if(!p) return;
   Swal.fire({
     title:'Factura ' + p.codigo,
     html:`<div style="font-size:13px;text-align:left;color:#94a3b8;">
@@ -269,10 +270,16 @@ function verFactura(id) {
       </table><br>
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <strong style="color:#38ef7d;font-size:16px;">Total: ${Andina.formatBs(p.total)}</strong>
-        <button onclick="imprimirFactura(${p.id})" style="background:linear-gradient(135deg,#00a859,#00c6ff); border:none; color:#fff; font-family:'Space Grotesk',sans-serif; font-weight:600; padding:6px 14px; border-radius:6px; cursor:pointer; transition:all 0.2s;"><i class="bi bi-file-earmark-pdf me-1"></i> Descargar PDF</button>
+        <button type="button" onclick="imprimirFactura(${p.id}); return false;" style="background:linear-gradient(135deg,#00a859,#00c6ff); border:none; color:#fff; font-family:'Space Grotesk',sans-serif; font-weight:600; padding:6px 14px; border-radius:6px; cursor:pointer; transition:all 0.2s;"><i class="bi bi-file-earmark-pdf me-1"></i> Descargar PDF</button>
       </div>
     </div>`,
-    showConfirmButton:false, showCloseButton:true,
+    showConfirmButton:true,
+    confirmButtonText:'Cerrar',
+    showCloseButton:true,
+    allowOutsideClick:true,
+    allowEscapeKey:true,
+    focusConfirm:false,
+    confirmButtonColor:'#1e293b',
     background:'#111827', color:'#e2e8f0'
   });
 }
@@ -280,9 +287,15 @@ function verFactura(id) {
 function imprimirFactura(id) {
   const p = pedidosCliente.find(x=>x.id===id);
   if(!p) return;
+
+  Swal.close();
   
   // Crear ventana para renderizar el PDF limpio
   const w = window.open('', '_blank');
+  if (!w) {
+    Andina.showToast('Permite ventanas emergentes para descargar la factura', 'warning');
+    return;
+  }
   w.document.write(`
     <html><head><title>Factura_${p.codigo}</title>
     <style>
@@ -328,7 +341,12 @@ function imprimirFactura(id) {
       </table>
       <div class="total">TOTAL A PAGAR: ${Andina.formatBs(p.total)}</div>
       <div class="footer">Esta es una representación impresa de su recibo de compra en línea.<br>¡Gracias por su preferencia!</div>
-      <script>window.onload = () => { window.print(); window.close(); }<\/script>
+      <script>
+        window.onload = () => {
+          window.focus();
+          window.print();
+        };
+      <\/script>
     </body></html>
   `);
   w.document.close();

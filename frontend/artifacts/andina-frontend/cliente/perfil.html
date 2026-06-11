@@ -280,12 +280,13 @@ document.getElementById('perfilForm').addEventListener('submit', async function(
   
   const res = await Andina.apiRequest('actualizar_perfil', data);
   if (res && res.exito) {
+    const perfil = res.datos || data;
     const s = Andina.getSession();
-    s.nombre = data.nombre; 
-    s.email = data.email;
-    s.telefono = data.telefono;
-    s.direccion = data.direccion;
-    s.nit_ci = data.nit_ci;
+    s.nombre = perfil.nombre; 
+    s.email = perfil.email;
+    s.telefono = perfil.telefono;
+    s.direccion = perfil.direccion;
+    s.nit_ci = perfil.nit_ci;
     Andina.setSession(s);
     
     // Actualizar la vista (Avatar card)

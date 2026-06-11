@@ -12,22 +12,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   const rol = session.rol;
 
   // Intentar traer pedidos reales de la BD
-  const res = await Andina.apiRequest('listar_pedidos', {}, 'GET');
-  if (res.exito && res.pedidos && res.pedidos.length > 0) {
-    pedidosData = res.pedidos.map(p => ({
-      id: p.id,
-      codigo: p.codigo,
-      cliente: p.cliente,
-      fecha: p.fecha,
+  const res = await Andina.apiRequest('listar_pedidos', { limite: 1000 }, 'GET');
+  let pedidosReales = [];
+  if (res.exito && res.pedidos) {
+    pedidosReales = res.pedidos.map(p => ({
+      id: parseInt(p.id_pedido || p.id),
+      codigo: p.codigo_pedido || p.codigo,
+      cliente: p.cliente_nombre || p.cliente,
+      fecha: p.fecha_pedido || p.fecha,
       estado: p.estado,
-      total: parseFloat(p.total),
-      creado_por: p.creado_por,
-      id_usuario: p.id_usuario
+      total: parseFloat(p.total_pedido || p.total) || 0,
+      creado_por: p.creador_nombre || p.creado_por,
+      id_usuario: parseInt(p.id_usuario_creador || p.id_usuario) || 0,
+      detalles: Array.isArray(p.detalles) ? p.detalles : []
     }));
-  } else {
-    // Fallback a datos imaginarios
-    pedidosData = Andina.MOCK_DATA.pedidos;
   }
+  
+  // Combinar los pedidos simulados de muestra con los reales
+  const codigosReales = new Set(pedidosReales.map(p => p.codigo));
+  const pedidosSimuladosFiltrados = Andina.MOCK_DATA.pedidos.filter(p => !codigosReales.has(p.codigo));
+  pedidosData = [...pedidosReales, ...pedidosSimuladosFiltrados];
 
   let pedidos = pedidosData;
   // Empleado solo ve sus pedidos
@@ -137,14 +141,26 @@ function cambiarEstadoPedido(id, codigo, nuevoEstado) {
 function verDetallePedido(id) {
   const p = pedidosData.find(x=>x.id===id);
   if(!p) return;
-  // Generar detalles simulados
-  const items = Andina.MOCK_DATA.productos.slice(0,3).map(prod => `
+  const detalles = Array.isArray(p.detalles) && p.detalles.length
+    ? p.detalles
+    : Andina.MOCK_DATA.productos.slice(0,3).map(prod => ({
+        producto_nombre: prod.nombre,
+        cantidad: Math.ceil(Math.random()*10),
+        precio_unitario: prod.precio
+      }));
+
+  const items = detalles.map(det => {
+    const nombre = det.producto_nombre || det.nombre || 'Producto';
+    const cantidad = parseInt(det.cantidad) || 0;
+    const precio = parseFloat(det.precio_unitario || det.precio) || 0;
+    return `
     <tr>
-      <td>${prod.nombre}</td>
-      <td class="text-center">${Math.ceil(Math.random()*10)}</td>
-      <td>${Andina.formatBs(prod.precio)}</td>
-      <td><strong>${Andina.formatBs(prod.precio * Math.ceil(Math.random()*10))}</strong></td>
-    </tr>`).join('');
+      <td>${nombre}</td>
+      <td class="text-center">${cantidad}</td>
+      <td>${Andina.formatBs(precio)}</td>
+      <td><strong>${Andina.formatBs(precio * cantidad)}</strong></td>
+    </tr>`;
+  }).join('');
 
   Swal.fire({
     title: p.codigo,
