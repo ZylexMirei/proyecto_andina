@@ -124,7 +124,7 @@ function generarReporte() {
 function renderInventarioReport() {
   document.getElementById('chartTitle').innerHTML='<i class="bi bi-bar-chart me-2"></i>Stock por producto';
   document.getElementById('tablaTitle').innerHTML='<i class="bi bi-table me-2"></i>Inventario completo';
-  const prods = Andina.MOCK_DATA.productos;
+  const prods = [];
 
   document.getElementById('kpisRow').innerHTML = `
     <div class="col-md-3"><div class="stat-card"><div class="stat-icon success"><i class="bi bi-boxes"></i></div><div class="stat-info"><div class="stat-number">${prods.reduce((a,b)=>a+b.stock,0)}</div><div class="stat-label">Unidades en stock</div></div></div></div>
@@ -145,7 +145,7 @@ function renderInventarioReport() {
 }
 
 function renderPedidosReport() {
-  const pedidos = Andina.MOCK_DATA.pedidos;
+  const pedidos = [];
   document.getElementById('kpisRow').innerHTML=`
     <div class="col-md-3"><div class="stat-card"><div class="stat-icon primary"><i class="bi bi-receipt"></i></div><div class="stat-info"><div class="stat-number">${pedidos.length}</div><div class="stat-label">Total pedidos</div></div></div></div>
     <div class="col-md-3"><div class="stat-card"><div class="stat-icon success"><i class="bi bi-check-circle"></i></div><div class="stat-info"><div class="stat-number">${pedidos.filter(p=>p.estado==='Completado').length}</div><div class="stat-label">Completados</div></div></div></div>
@@ -161,15 +161,15 @@ function renderPedidosReport() {
 }
 
 function renderVentasReport() {
-  const prods=Andina.MOCK_DATA.productos;
-  document.getElementById('kpisRow').innerHTML=`<div class="col-md-4"><div class="stat-card"><div class="stat-icon primary"><i class="bi bi-box-seam"></i></div><div class="stat-info"><div class="stat-number">${prods.length}</div><div class="stat-label">Productos en catálogo</div></div></div></div><div class="col-md-4"><div class="stat-card"><div class="stat-icon accent"><i class="bi bi-currency-dollar"></i></div><div class="stat-info"><div class="stat-number">${Andina.formatBs(prods.reduce((a,b)=>a+(b.precio*10),0))}</div><div class="stat-label">Ventas simuladas</div></div></div></div><div class="col-md-4"><div class="stat-card"><div class="stat-icon success"><i class="bi bi-graph-up"></i></div><div class="stat-info"><div class="stat-number">+12%</div><div class="stat-label">Crecimiento mensual</div></div></div></div>`;
+  const prods=[];
+  document.getElementById('kpisRow').innerHTML=`<div class="col-md-4"><div class="stat-card"><div class="stat-icon primary"><i class="bi bi-box-seam"></i></div><div class="stat-info"><div class="stat-number">${prods.length}</div><div class="stat-label">Productos en catálogo</div></div></div></div><div class="col-md-4"><div class="stat-card"><div class="stat-icon accent"><i class="bi bi-currency-dollar"></i></div><div class="stat-info"><div class="stat-number">${Andina.formatBs(prods.reduce((a,b)=>a+(b.precio*10),0))}</div><div class="stat-label">Ventas reales</div></div></div></div><div class="col-md-4"><div class="stat-card"><div class="stat-icon success"><i class="bi bi-graph-up"></i></div><div class="stat-info"><div class="stat-number">0%</div><div class="stat-label">Crecimiento mensual</div></div></div></div>`;
   const ctx=document.getElementById('chartReporte').getContext('2d');
-  chartReporte=new Chart(ctx,{type:'bar',data:{labels:prods.map(p=>p.nombre.substring(0,12)+'...'),datasets:[{label:'Unidades vendidas',data:prods.map(_=>Math.floor(Math.random()*50)+5),backgroundColor:'rgba(26,58,92,0.8)',borderRadius:6},{label:'Ingresos (Bs.)',data:prods.map(p=>p.precio*Math.floor(Math.random()*50+5)),backgroundColor:'rgba(0,168,89,0.6)',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,grid:{color:'#f0f4f8'}},x:{grid:{display:false}}}}});
+  chartReporte=new Chart(ctx,{type:'bar',data:{labels:prods.map(p=>p.nombre.substring(0,12)+'...'),datasets:[{label:'Unidades vendidas',data:prods.map(_=>0),backgroundColor:'rgba(26,58,92,0.8)',borderRadius:6},{label:'Ingresos (Bs.)',data:prods.map(_=>0),backgroundColor:'rgba(0,168,89,0.6)',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,grid:{color:'#f0f4f8'}},x:{grid:{display:false}}}}});
   const ctx2=document.getElementById('chartDistrib').getContext('2d');
   const cats={};prods.forEach(p=>cats[p.categoria]=(cats[p.categoria]||0)+1);
   chartDistrib=new Chart(ctx2,{type:'pie',data:{labels:Object.keys(cats),datasets:[{data:Object.values(cats),backgroundColor:['#1a3a5c','#00a859','#ffc107','#dc3545','#0d6efd','#6c757d','#fd7e14'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
   document.getElementById('theadReporte').innerHTML='<tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Uds. vendidas</th><th>Ingresos</th></tr>';
-  document.getElementById('tbodyReporte').innerHTML=prods.map(p=>{const uds=Math.floor(Math.random()*50)+5;return`<tr><td><strong>${p.nombre}</strong></td><td><span class="badge" style="background:var(--secondary);color:var(--primary);">${p.categoria}</span></td><td>${Andina.formatBs(p.precio)}</td><td>${uds}</td><td><strong>${Andina.formatBs(p.precio*uds)}</strong></td></tr>`;}).join('');
+  document.getElementById('tbodyReporte').innerHTML=prods.map(p=>{const uds=0;return`<tr><td><strong>${p.nombre}</strong></td><td><span class="badge" style="background:var(--secondary);color:var(--primary);">${p.categoria}</span></td><td>${Andina.formatBs(p.precio)}</td><td>${uds}</td><td><strong>${Andina.formatBs(p.precio*uds)}</strong></td></tr>`;}).join('');
   $('#tablaReporte').DataTable({language:{url:'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json'},order:[[3,'desc']],pageLength:10});
 }
 
@@ -211,6 +211,124 @@ function exportarCSV() {
   document.body.removeChild(a);
   Andina.showToast('CSV descargado correctamente','success');
 }
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+function formatReporteValue(value, header) {
+  const textHeader = String(header || '').toLowerCase();
+  if (textHeader.includes('valor') || textHeader.includes('total') || textHeader.includes('ingresos') || textHeader.includes('precio')) {
+    return Andina.formatBs(value);
+  }
+  if (textHeader.includes('fecha')) return Andina.formatFechaCorta(value);
+  return escapeHtml(value);
+}
+
+function renderKpisReales(kpis) {
+  document.getElementById('kpisRow').innerHTML = (kpis || []).map(kpi => `
+    <div class="col-md-3">
+      <div class="stat-card">
+        <div class="stat-icon ${escapeHtml(kpi.type || 'primary')}"><i class="bi ${escapeHtml(kpi.icon || 'bi-graph-up')}"></i></div>
+        <div class="stat-info">
+          <div class="stat-number">${kpi.format === 'money' ? Andina.formatBs(kpi.value) : escapeHtml(kpi.value)}</div>
+          <div class="stat-label">${escapeHtml(kpi.label)}</div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderTablaReal(reporte) {
+  document.getElementById('tablaTitle').innerHTML = `<i class="bi bi-table me-2"></i>${escapeHtml(reporte.titulo || 'Resultados')}`;
+  document.getElementById('theadReporte').innerHTML = `<tr>${reporte.headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>`;
+  document.getElementById('tbodyReporte').innerHTML = (reporte.rows || []).map(row => `
+    <tr>${row.map((value, index) => {
+      const header = reporte.headers[index] || '';
+      const lower = String(header).toLowerCase();
+      if (lower.includes('estado')) return `<td>${Andina.getBadgeEstado(value)}</td>`;
+      if (lower.includes('codigo')) return `<td><code style="font-size:12px;">${escapeHtml(value)}</code></td>`;
+      if (index === 1) return `<td><strong>${escapeHtml(value)}</strong></td>`;
+      return `<td>${formatReporteValue(value, header)}</td>`;
+    }).join('')}</tr>`).join('');
+
+  $('#tablaReporte').DataTable({
+    language: { url: 'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json' },
+    pageLength: 10,
+    order: [],
+  });
+}
+
+function renderGraficasReales(reporte) {
+  document.getElementById('chartTitle').innerHTML = `<i class="bi bi-bar-chart me-2"></i>${escapeHtml(reporte.chart?.title || 'Grafico')}`;
+  const labels = reporte.chart?.labels || [];
+  const palette = ['rgba(26,58,92,0.85)', 'rgba(0,168,89,0.68)', 'rgba(255,193,7,0.68)'];
+  const datasets = (reporte.chart?.datasets || []).map((dataset, index) => ({
+    label: dataset.label,
+    data: dataset.data,
+    backgroundColor: palette[index % palette.length],
+    borderRadius: 6,
+  }));
+
+  chartReporte = new Chart(document.getElementById('chartReporte').getContext('2d'), {
+    type: reporte.chart?.type || 'bar',
+    data: { labels: labels.map(label => String(label).length > 18 ? String(label).slice(0, 18) + '...' : label), datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f0f4f8' } },
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+      },
+    },
+  });
+
+  chartDistrib = new Chart(document.getElementById('chartDistrib').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: reporte.distribution?.labels || [],
+      datasets: [{
+        data: reporte.distribution?.data || [],
+        backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#6c757d', '#0d6efd', '#00a859', '#1a3a5c'],
+        borderWidth: 0,
+      }],
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
+  });
+}
+
+generarReporte = async function() {
+  const tipo = document.getElementById('tipoReporte').value;
+  const fechaDesde = document.getElementById('fechaDesde').value;
+  const fechaHasta = document.getElementById('fechaHasta').value;
+
+  if (chartReporte) chartReporte.destroy();
+  if (chartDistrib) chartDistrib.destroy();
+  if ($.fn.DataTable.isDataTable('#tablaReporte')) $('#tablaReporte').DataTable().destroy();
+
+  document.getElementById('kpisRow').innerHTML = '<div class="col-12 text-center py-4 text-muted">Cargando reporte...</div>';
+  document.getElementById('tbodyReporte').innerHTML = '';
+
+  const res = await Andina.apiRequest(`reporte_datos&tipo=${encodeURIComponent(tipo)}&fecha_desde=${encodeURIComponent(fechaDesde)}&fecha_hasta=${encodeURIComponent(fechaHasta)}`, {}, 'GET');
+  if (!res.exito || !res.reporte) {
+    Andina.showToast(res.error || 'No se pudo generar el reporte', 'error');
+    document.getElementById('kpisRow').innerHTML = '<div class="col-12 text-center py-4 text-danger">No se pudo cargar el reporte.</div>';
+    return;
+  }
+
+  renderKpisReales(res.reporte.kpis);
+  renderGraficasReales(res.reporte);
+  renderTablaReal(res.reporte);
+};
+
+exportarCSV = function() {
+  const tipo = document.getElementById('tipoReporte').value;
+  const fechaDesde = document.getElementById('fechaDesde').value;
+  const fechaHasta = document.getElementById('fechaHasta').value;
+  const sessionToken = encodeURIComponent(session.token || '');
+  window.location.href = `/test_api.php?accion=exportar_reporte_csv&tipo=${encodeURIComponent(tipo)}&fecha_desde=${encodeURIComponent(fechaDesde)}&fecha_hasta=${encodeURIComponent(fechaHasta)}&id_usuario=${encodeURIComponent(session.id_usuario || '')}&token=${sessionToken}`;
+  Andina.showToast('Descargando CSV ordenado...', 'success');
+};
 
 // Generar reporte inicial
 generarReporte();

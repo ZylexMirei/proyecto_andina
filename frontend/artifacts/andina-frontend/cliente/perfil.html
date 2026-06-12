@@ -256,17 +256,38 @@
 const session = Andina.requireClienteAuth();
 if(!session) throw new Error('no session');
 
-const initials = session.nombre.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-document.getElementById('avatarCircle').textContent = initials;
-document.getElementById('profileNombre').textContent = session.nombre;
-document.getElementById('profileEmail').textContent = session.email;
+function pintarPerfil(perfil) {
+  const nombre = perfil?.nombre || '';
+  const email = perfil?.email || '';
+  const initials = nombre.split(' ').filter(Boolean).map(w=>w[0]).join('').substring(0,2).toUpperCase() || 'DA';
+  document.getElementById('avatarCircle').textContent = initials;
+  document.getElementById('profileNombre').textContent = nombre || 'Cliente';
+  document.getElementById('profileEmail').textContent = email || '—';
+  document.getElementById('pNombre').value = nombre;
+  document.getElementById('pEmail').value = email;
+  document.getElementById('pTel').value = perfil?.telefono || '';
+  document.getElementById('pDir').value = perfil?.direccion || '';
+  document.getElementById('pNit').value = perfil?.nit_ci || '';
+}
 
-// Cargar datos en el formulario
-document.getElementById('pNombre').value = session.nombre || '';
-document.getElementById('pEmail').value = session.email || '';
-document.getElementById('pTel').value = session.telefono || '';
-document.getElementById('pDir').value = session.direccion || '';
-document.getElementById('pNit').value = session.nit_ci || '';
+function guardarPerfilEnSesion(perfil) {
+  const actual = Andina.getSession() || {};
+  const nuevo = { ...actual, ...perfil };
+  Andina.setSession(nuevo);
+  pintarPerfil(nuevo);
+  return nuevo;
+}
+
+pintarPerfil(session);
+
+async function cargarPerfilReal() {
+  const res = await Andina.apiRequest('obtener_perfil', {}, 'GET');
+  if (res && res.exito && res.datos) {
+    guardarPerfilEnSesion(res.datos);
+  }
+}
+
+cargarPerfilReal();
 
 document.getElementById('perfilForm').addEventListener('submit', async function(e){
   e.preventDefault();
@@ -281,20 +302,7 @@ document.getElementById('perfilForm').addEventListener('submit', async function(
   const res = await Andina.apiRequest('actualizar_perfil', data);
   if (res && res.exito) {
     const perfil = res.datos || data;
-    const s = Andina.getSession();
-    s.nombre = perfil.nombre; 
-    s.email = perfil.email;
-    s.telefono = perfil.telefono;
-    s.direccion = perfil.direccion;
-    s.nit_ci = perfil.nit_ci;
-    Andina.setSession(s);
-    
-    // Actualizar la vista (Avatar card)
-    document.getElementById('profileNombre').textContent = s.nombre;
-    document.getElementById('profileEmail').textContent = s.email;
-    const newInitials = s.nombre.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-    document.getElementById('avatarCircle').textContent = newInitials;
-    
+    guardarPerfilEnSesion(perfil);
     Andina.showToast('Perfil actualizado correctamente', 'success');
   } else {
     Andina.showToast(res?.error || 'Error al actualizar el perfil', 'error');

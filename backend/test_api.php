@@ -10,6 +10,7 @@
 // Habilitar el reporte de errores para ver problemas ocultos de MySQL
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+date_default_timezone_set('America/La_Paz');
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -187,6 +188,351 @@ function normalizarItemsPedido($items) {
     }
 
     return $normalizados;
+}
+
+function configurarZonaHorariaBD(PDO $db) {
+    try {
+        $db->exec("SET time_zone = '-04:00'");
+    } catch (Throwable $e) {}
+}
+
+function obtenerPerfilClienteActual(PDO $db, $id_usuario, $email_referencia = '') {
+    $stmt = $db->prepare(
+        "SELECT u.id_usuario, u.username, u.email AS usuario_email, r.nombre AS rol,
+                c.id_cliente, c.razon_social, c.nit_ci, c.telefono, c.email AS cliente_email, c.direccion
+         FROM usuarios u
+         LEFT JOIN roles r ON u.id_rol = r.id_rol
+         LEFT JOIN clientes c ON c.email = u.email OR (:email_ref_check <> '' AND c.email = :email_ref_value)
+         WHERE u.id_usuario = :id
+         ORDER BY c.id_cliente DESC
+         LIMIT 1"
+    );
+    $stmt->bindValue(':id', $id_usuario, PDO::PARAM_INT);
+    $stmt->bindValue(':email_ref_check', $email_referencia);
+    $stmt->bindValue(':email_ref_value', $email_referencia);
+    $stmt->execute();
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$row) return null;
+
+    $nombre = $row['razon_social'] ?: $row['username'];
+    $email = $row['cliente_email'] ?: $row['usuario_email'];
+
+    return [
+        'id_usuario' => (int) $row['id_usuario'],
+        'id_cliente' => $row['id_cliente'] ? (int) $row['id_cliente'] : null,
+        'username' => $row['username'],
+        'nombre' => $nombre,
+        'email' => $email,
+        'rol' => $row['rol'] ?: ($_SESSION['rol'] ?? 'Cliente'),
+        'telefono' => $row['telefono'] ?: '',
+        'direccion' => $row['direccion'] ?: '',
+        'nit_ci' => $row['nit_ci'] ?: '',
+    ];
+}
+
+function sincronizarSesionPerfil($perfil) {
+    if (!$perfil) return;
+    $_SESSION['id_usuario'] = $perfil['id_usuario'];
+    $_SESSION['email'] = $perfil['email'];
+    $_SESSION['nombre'] = $perfil['nombre'];
+    $_SESSION['rol'] = $perfil['rol'];
+    $_SESSION['telefono'] = $perfil['telefono'];
+    $_SESSION['direccion'] = $perfil['direccion'];
+    $_SESSION['nit_ci'] = $perfil['nit_ci'];
+}
+
+function registrarLogAcceso(PDO $db, $id_usuario, $username, $exito) {
+    try {
+        $ip = obtenerIP();
+        $cols = [];
+        $values = [];
+        $params = [];
+
+        if (columnaExiste($db, 'log_accesos', 'id_usuario')) {
+            $cols[] = 'id_usuario';
+            $values[] = ':id_usuario';
+            $params[':id_usuario'] = $id_usuario;
+        }
+        if (columnaExiste($db, 'log_accesos', 'username')) {
+            $cols[] = 'username';
+            $values[] = ':username';
+            $params[':username'] = $username;
+        }
+        if (columnaExiste($db, 'log_accesos', 'usuario')) {
+            $cols[] = 'usuario';
+            $values[] = ':usuario';
+            $params[':usuario'] = $username;
+        }
+        if (columnaExiste($db, 'log_accesos', 'exito')) {
+            $cols[] = 'exito';
+            $values[] = ':exito';
+            $params[':exito'] = $exito ? 1 : 0;
+        }
+        if (columnaExiste($db, 'log_accesos', 'resultado')) {
+            $cols[] = 'resultado';
+            $values[] = ':resultado';
+            $params[':resultado'] = $exito ? 'Éxito' : 'Fallido';
+        }
+        if (columnaExiste($db, 'log_accesos', 'ip_address')) {
+            $cols[] = 'ip_address';
+            $values[] = ':ip_address';
+            $params[':ip_address'] = $ip;
+        }
+        if (columnaExiste($db, 'log_accesos', 'ip')) {
+            $cols[] = 'ip';
+            $values[] = ':ip';
+            $params[':ip'] = $ip;
+        }
+        if (columnaExiste($db, 'log_accesos', 'accion')) {
+            $cols[] = 'accion';
+            $values[] = ':accion';
+            $params[':accion'] = $exito ? 'Inicio de sesión' : 'Intento fallido de inicio de sesión';
+        }
+        if (columnaExiste($db, 'log_accesos', 'fecha_hora')) {
+            $cols[] = 'fecha_hora';
+            $values[] = 'NOW()';
+        } elseif (columnaExiste($db, 'log_accesos', 'fecha')) {
+            $cols[] = 'fecha';
+            $values[] = 'NOW()';
+        } elseif (columnaExiste($db, 'log_accesos', 'created_at')) {
+            $cols[] = 'created_at';
+            $values[] = 'NOW()';
+        }
+
+        if (empty($cols)) return;
+
+        $sql = "INSERT INTO log_accesos (`" . implode('`,`', $cols) . "`) VALUES (" . implode(',', $values) . ")";
+        $stmt = $db->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->execute();
+    } catch (Throwable $e) {}
+}
+
+function fechaReporteValida($fecha) {
+    return is_string($fecha) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha);
+}
+
+function filtroFechasPedido(&$params, $alias = 'p') {
+    $where = [];
+    $fecha_desde = sanitizar_input($_GET['fecha_desde'] ?? '');
+    $fecha_hasta = sanitizar_input($_GET['fecha_hasta'] ?? '');
+
+    if (fechaReporteValida($fecha_desde)) {
+        $where[] = "{$alias}.fecha_pedido >= :fecha_desde";
+        $params[':fecha_desde'] = $fecha_desde;
+    }
+    if (fechaReporteValida($fecha_hasta)) {
+        $where[] = "{$alias}.fecha_pedido <= :fecha_hasta";
+        $params[':fecha_hasta'] = $fecha_hasta;
+    }
+
+    return $where;
+}
+
+function obtenerReporteAndina(PDO $db, $tipo) {
+    $tipo = in_array($tipo, ['inventario', 'pedidos', 'ventas'], true) ? $tipo : 'inventario';
+    $params = [];
+
+    if ($tipo === 'inventario') {
+        $sql = "
+            SELECT
+                p.codigo,
+                p.nombre AS producto,
+                COALESCE(c.nombre, 'Sin categoria') AS categoria,
+                COALESCE(SUM(i.cantidad_actual), 0) AS stock,
+                COALESCE(MIN(i.stock_minimo), 0) AS stock_minimo,
+                CASE
+                    WHEN COALESCE(SUM(i.cantidad_actual), 0) = 0 THEN 'Agotado'
+                    WHEN COALESCE(SUM(i.cantidad_actual), 0) <= COALESCE(MIN(i.stock_minimo), 0) THEN 'Critico'
+                    WHEN COALESCE(SUM(i.cantidad_actual), 0) <= COALESCE(MIN(i.stock_minimo), 0) * 1.3 THEN 'Alerta'
+                    ELSE 'Normal'
+                END AS estado,
+                COALESCE(p.precio_referencia, 0) AS precio,
+                COALESCE(SUM(i.cantidad_actual), 0) * COALESCE(p.precio_referencia, 0) AS valor
+            FROM productos p
+            LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+            LEFT JOIN inventario i ON p.id_producto = i.id_producto
+            GROUP BY p.id_producto, p.codigo, p.nombre, c.nombre, p.precio_referencia
+            ORDER BY stock ASC, p.nombre ASC
+        ";
+        $stmt = $db->prepare($sql);
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $totalStock = 0;
+        $totalValor = 0;
+        $alertas = 0;
+        $dist = ['Normal' => 0, 'Alerta' => 0, 'Critico' => 0, 'Agotado' => 0];
+        foreach ($rows as $row) {
+            $totalStock += (int) $row['stock'];
+            $totalValor += (float) $row['valor'];
+            if ($row['estado'] !== 'Normal') $alertas++;
+            $dist[$row['estado']] = ($dist[$row['estado']] ?? 0) + 1;
+        }
+
+        return [
+            'tipo' => $tipo,
+            'titulo' => 'Inventario completo',
+            'headers' => ['Codigo', 'Producto', 'Categoria', 'Stock', 'Minimo', 'Estado', 'Valor'],
+            'rows' => array_map(fn($r) => [
+                $r['codigo'], $r['producto'], $r['categoria'], (int) $r['stock'],
+                (int) $r['stock_minimo'], $r['estado'], round((float) $r['valor'], 2)
+            ], $rows),
+            'kpis' => [
+                ['label' => 'Unidades en stock', 'value' => $totalStock, 'type' => 'success', 'icon' => 'bi-boxes'],
+                ['label' => 'Total productos', 'value' => count($rows), 'type' => 'primary', 'icon' => 'bi-box-seam'],
+                ['label' => 'En alerta', 'value' => $alertas, 'type' => 'warning', 'icon' => 'bi-exclamation-triangle'],
+                ['label' => 'Valor inventario', 'value' => round($totalValor, 2), 'format' => 'money', 'type' => 'accent', 'icon' => 'bi-cash-stack'],
+            ],
+            'chart' => [
+                'title' => 'Stock por producto',
+                'type' => 'bar',
+                'labels' => array_map(fn($r) => $r['producto'], array_slice($rows, 0, 12)),
+                'datasets' => [
+                    ['label' => 'Stock actual', 'data' => array_map(fn($r) => (int) $r['stock'], array_slice($rows, 0, 12))],
+                    ['label' => 'Stock minimo', 'data' => array_map(fn($r) => (int) $r['stock_minimo'], array_slice($rows, 0, 12))],
+                ],
+            ],
+            'distribution' => ['title' => 'Estado de stock', 'labels' => array_keys($dist), 'data' => array_values($dist)],
+        ];
+    }
+
+    if ($tipo === 'pedidos') {
+        $where = filtroFechasPedido($params, 'p');
+        $totalExpr = columnaExiste($db, 'pedidos', 'total')
+            ? "COALESCE(p.total, SUM(dp.cantidad * dp.precio_unitario), 0)"
+            : "COALESCE(SUM(dp.cantidad * dp.precio_unitario), 0)";
+        $usuarioJoin = '';
+        $usuarioSelect = "'Sistema' AS creado_por";
+        $usuarioGroup = '';
+        if (columnaExiste($db, 'pedidos', 'id_usuario_creador')) {
+            $usuarioJoin = " LEFT JOIN usuarios u ON p.id_usuario_creador = u.id_usuario";
+            $usuarioSelect = "COALESCE(u.username, 'Sistema') AS creado_por";
+            $usuarioGroup = ", u.username";
+        } elseif (columnaExiste($db, 'pedidos', 'id_usuario')) {
+            $usuarioJoin = " LEFT JOIN usuarios u ON p.id_usuario = u.id_usuario";
+            $usuarioSelect = "COALESCE(u.username, 'Sistema') AS creado_por";
+            $usuarioGroup = ", u.username";
+        }
+        $totalGroup = columnaExiste($db, 'pedidos', 'total') ? ", p.total" : "";
+        $sql = "
+            SELECT
+                p.codigo_pedido,
+                COALESCE(c.razon_social, 'Cliente sin nombre') AS cliente,
+                p.fecha_pedido,
+                p.estado,
+                {$totalExpr} AS total,
+                {$usuarioSelect}
+            FROM pedidos p
+            LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
+            {$usuarioJoin}
+            LEFT JOIN detalle_pedido dp ON p.id_pedido = dp.id_pedido";
+        if (!empty($where)) $sql .= " WHERE " . implode(' AND ', $where);
+        $sql .= " GROUP BY p.id_pedido, p.codigo_pedido, c.razon_social, p.fecha_pedido, p.estado{$totalGroup}{$usuarioGroup} ORDER BY p.fecha_pedido DESC";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $totalVentas = array_sum(array_map(fn($r) => (float) $r['total'], $rows));
+        $dist = [];
+        foreach ($rows as $row) $dist[$row['estado']] = ($dist[$row['estado']] ?? 0) + 1;
+
+        return [
+            'tipo' => $tipo,
+            'titulo' => 'Pedidos',
+            'headers' => ['Codigo', 'Cliente', 'Fecha', 'Estado', 'Total', 'Creado por'],
+            'rows' => array_map(fn($r) => [
+                $r['codigo_pedido'], $r['cliente'], $r['fecha_pedido'], $r['estado'], round((float) $r['total'], 2), $r['creado_por']
+            ], $rows),
+            'kpis' => [
+                ['label' => 'Total pedidos', 'value' => count($rows), 'type' => 'primary', 'icon' => 'bi-receipt'],
+                ['label' => 'Completados', 'value' => (int) ($dist['Completado'] ?? 0), 'type' => 'success', 'icon' => 'bi-check-circle'],
+                ['label' => 'Pendientes', 'value' => (int) ($dist['Pendiente'] ?? 0), 'type' => 'warning', 'icon' => 'bi-clock'],
+                ['label' => 'Ventas totales', 'value' => round($totalVentas, 2), 'format' => 'money', 'type' => 'accent', 'icon' => 'bi-cash-stack'],
+            ],
+            'chart' => [
+                'title' => 'Total por pedido',
+                'type' => 'bar',
+                'labels' => array_map(fn($r) => $r['codigo_pedido'], array_slice($rows, 0, 12)),
+                'datasets' => [['label' => 'Total (Bs.)', 'data' => array_map(fn($r) => round((float) $r['total'], 2), array_slice($rows, 0, 12))]],
+            ],
+            'distribution' => ['title' => 'Estado de pedidos', 'labels' => array_keys($dist), 'data' => array_values($dist)],
+        ];
+    }
+
+    $where = filtroFechasPedido($params, 'pe');
+    $sql = "
+        SELECT
+            p.codigo,
+            p.nombre AS producto,
+            COALESCE(c.nombre, 'Sin categoria') AS categoria,
+            COALESCE(p.precio_referencia, 0) AS precio,
+            COALESCE(SUM(dp.cantidad), 0) AS unidades,
+            COALESCE(SUM(dp.cantidad * dp.precio_unitario), 0) AS ingresos
+        FROM detalle_pedido dp
+        JOIN pedidos pe ON dp.id_pedido = pe.id_pedido
+        JOIN productos p ON dp.id_producto = p.id_producto
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+        WHERE pe.estado != 'Cancelado'";
+    if (!empty($where)) $sql .= " AND " . implode(' AND ', $where);
+    $sql .= " GROUP BY p.id_producto, p.codigo, p.nombre, c.nombre, p.precio_referencia ORDER BY ingresos DESC";
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $totalUnidades = array_sum(array_map(fn($r) => (int) $r['unidades'], $rows));
+    $totalIngresos = array_sum(array_map(fn($r) => (float) $r['ingresos'], $rows));
+    $dist = [];
+    foreach ($rows as $row) $dist[$row['categoria']] = ($dist[$row['categoria']] ?? 0) + (int) $row['unidades'];
+
+    return [
+        'tipo' => $tipo,
+        'titulo' => 'Ventas por producto',
+        'headers' => ['Codigo', 'Producto', 'Categoria', 'Precio', 'Unidades vendidas', 'Ingresos'],
+        'rows' => array_map(fn($r) => [
+            $r['codigo'], $r['producto'], $r['categoria'], round((float) $r['precio'], 2), (int) $r['unidades'], round((float) $r['ingresos'], 2)
+        ], $rows),
+        'kpis' => [
+            ['label' => 'Productos vendidos', 'value' => count($rows), 'type' => 'primary', 'icon' => 'bi-box-seam'],
+            ['label' => 'Unidades vendidas', 'value' => $totalUnidades, 'type' => 'success', 'icon' => 'bi-graph-up'],
+            ['label' => 'Ingresos', 'value' => round($totalIngresos, 2), 'format' => 'money', 'type' => 'accent', 'icon' => 'bi-cash-stack'],
+            ['label' => 'Ticket promedio', 'value' => $totalUnidades > 0 ? round($totalIngresos / $totalUnidades, 2) : 0, 'format' => 'money', 'type' => 'warning', 'icon' => 'bi-calculator'],
+        ],
+        'chart' => [
+            'title' => 'Productos mas vendidos',
+            'type' => 'bar',
+            'labels' => array_map(fn($r) => $r['producto'], array_slice($rows, 0, 12)),
+            'datasets' => [
+                ['label' => 'Unidades vendidas', 'data' => array_map(fn($r) => (int) $r['unidades'], array_slice($rows, 0, 12))],
+                ['label' => 'Ingresos (Bs.)', 'data' => array_map(fn($r) => round((float) $r['ingresos'], 2), array_slice($rows, 0, 12))],
+            ],
+        ],
+        'distribution' => ['title' => 'Unidades por categoria', 'labels' => array_keys($dist), 'data' => array_values($dist)],
+    ];
+}
+
+function descargarReporteCsv($reporte) {
+    $filename = 'reporte_andina_' . $reporte['tipo'] . '_' . date('Y-m-d_His') . '.csv';
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    $out = fopen('php://output', 'w');
+    fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+    fputcsv($out, ['Distribuidora Andina SRL']);
+    fputcsv($out, [$reporte['titulo']]);
+    fputcsv($out, ['Generado', date('Y-m-d H:i:s')]);
+    fputcsv($out, []);
+    fputcsv($out, $reporte['headers']);
+    foreach ($reporte['rows'] as $row) {
+        fputcsv($out, $row);
+    }
+    fclose($out);
+    exit();
 }
 
 switch ($accion) {
@@ -443,6 +789,24 @@ switch ($accion) {
         }
         break;
 
+    // ==================== OBTENER PERFIL ACTUAL ====================
+    case 'obtener_perfil':
+        requireApiAuth();
+
+        try {
+            $db = (new Database())->getConnection();
+            $perfil = obtenerPerfilClienteActual($db, (int) $_SESSION['id_usuario'], $_SESSION['email'] ?? '');
+            if (!$perfil) {
+                echo json_encode(["error" => "No se pudo cargar el perfil"], JSON_UNESCAPED_UNICODE);
+                exit();
+            }
+            sincronizarSesionPerfil($perfil);
+            echo json_encode(["exito" => true, "datos" => $perfil], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        }
+        break;
+
     // ==================== ACTUALIZAR PERFIL CLIENTE ====================
     case 'actualizar_perfil':
         requireApiAuth();
@@ -509,18 +873,14 @@ switch ($accion) {
                 $insertCliente->execute();
             }
 
-            $_SESSION['email'] = $email;
-            $_SESSION['nombre'] = $nombre;
-            $_SESSION['telefono'] = $telefono;
-            $_SESSION['direccion'] = $direccion;
-            $_SESSION['nit_ci'] = $nit_ci;
-
             $db->commit();
+            $perfilGuardado = obtenerPerfilClienteActual($db, (int) $id_usuario, $email);
+            sincronizarSesionPerfil($perfilGuardado);
 
             echo json_encode([
                 "exito" => true,
                 "mensaje" => "Perfil actualizado correctamente",
-                "datos" => [
+                "datos" => $perfilGuardado ?: [
                     "nombre" => $nombre,
                     "email" => $email,
                     "telefono" => $telefono,
@@ -620,6 +980,7 @@ switch ($accion) {
                 $upd = $db->prepare("UPDATE usuarios SET intentos_fallidos = intentos_fallidos + 1 WHERE id_usuario = :id");
                 $upd->bindValue(':id', $user['id_usuario']);
                 $upd->execute();
+                registrarLogAcceso($db, (int) $user['id_usuario'], $user['username'], false);
 
                 $intentosRestantes = 4 - $user['intentos_fallidos'];
                 if ($intentosRestantes <= 0) {
@@ -663,6 +1024,7 @@ switch ($accion) {
 
             // Guardar en la bitácora de MongoDB silenciosamente
             registrarAuditoria($user['username'], $user['rol'], "Inicio de sesión en el sistema", "Módulo de Seguridad");
+            registrarLogAcceso($db, (int) $user['id_usuario'], $user['username'], true);
 
             echo json_encode([
                 "exito" => true,
@@ -1608,16 +1970,25 @@ switch ($accion) {
         try {
             $db = (new Database())->getConnection();
             // Obtenemos los últimos 1000 accesos ordenados por el más reciente
-            $stmt = $db->prepare("SELECT * FROM log_accesos ORDER BY id_log DESC LIMIT 1000");
+            $orderCol = columnaExiste($db, 'log_accesos', 'fecha_hora') ? 'fecha_hora'
+                : (columnaExiste($db, 'log_accesos', 'fecha') ? 'fecha'
+                : (columnaExiste($db, 'log_accesos', 'created_at') ? 'created_at'
+                : (columnaExiste($db, 'log_accesos', 'id_log') ? 'id_log' : 'id')));
+            $stmt = $db->prepare("SELECT * FROM log_accesos ORDER BY `{$orderCol}` DESC LIMIT 1000");
             $stmt->execute();
 
             $logs = array_map(function($l) {
+                $resultado = $l['resultado'] ?? null;
+                if (!$resultado) {
+                    $resultado = (isset($l['exito']) && (int) $l['exito'] === 1) ? 'Éxito' : 'Fallido';
+                }
                 return [
                     'id' => $l['id_log'] ?? $l['id'] ?? 0,
-                    'usuario' => $l['username'] ?? 'Desconocido',
+                    'usuario' => $l['username'] ?? $l['usuario'] ?? 'Desconocido',
                     'ip' => $l['ip_address'] ?? $l['ip'] ?? '0.0.0.0',
-                    'resultado' => (isset($l['exito']) && $l['exito'] == 1) ? 'Éxito' : 'Fallido',
-                    'fecha' => $l['fecha'] ?? $l['creado_en'] ?? $l['fecha_acceso'] ?? $l['timestamp'] ?? date('Y-m-d H:i:s')
+                    'resultado' => $resultado,
+                    'accion' => $l['accion'] ?? '',
+                    'fecha' => $l['fecha_hora'] ?? $l['fecha'] ?? $l['created_at'] ?? $l['creado_en'] ?? $l['fecha_acceso'] ?? $l['timestamp'] ?? date('Y-m-d H:i:s')
                 ];
             }, $stmt->fetchAll());
 
@@ -1890,6 +2261,31 @@ switch ($accion) {
             echo json_encode(["exito" => true, "mensaje" => "Estado de compra actualizado"], JSON_UNESCAPED_UNICODE);
         } catch (Throwable $e) {
             echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    // ==================== REPORTES ====================
+    case 'reporte_datos':
+        requireApiAuth(['Administrador', 'Gerente']);
+
+        try {
+            $db = (new Database())->getConnection();
+            $tipo = sanitizar_input($_GET['tipo'] ?? 'inventario');
+            echo json_encode(["exito" => true, "reporte" => obtenerReporteAndina($db, $tipo)], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => "Error generando reporte: " . $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        }
+        break;
+
+    case 'exportar_reporte_csv':
+        requireApiAuth(['Administrador', 'Gerente']);
+
+        try {
+            $db = (new Database())->getConnection();
+            $tipo = sanitizar_input($_GET['tipo'] ?? 'inventario');
+            descargarReporteCsv(obtenerReporteAndina($db, $tipo));
+        } catch (Throwable $e) {
+            echo json_encode(["error" => "Error exportando reporte: " . $e->getMessage()], JSON_UNESCAPED_UNICODE);
         }
         break;
 

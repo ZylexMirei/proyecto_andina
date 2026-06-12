@@ -26,6 +26,7 @@
       background: var(--ink);
       color: var(--text);
       font-family: Inter, "Segoe UI", system-ui, sans-serif;
+      overflow-x: hidden;
     }
     a { text-decoration: none; }
     .topbar {
@@ -35,6 +36,7 @@
       background: rgba(7,17,31,.88);
       border-bottom: 1px solid var(--line);
       backdrop-filter: blur(16px);
+      box-shadow: 0 8px 30px rgba(0,0,0,.18);
     }
     .brand-mark {
       width: 42px;
@@ -46,26 +48,58 @@
       font-weight: 800;
       color: #8be7ff;
       background: linear-gradient(145deg, rgba(0,163,255,.15), rgba(0,168,89,.12));
+      box-shadow: 0 0 0 0 rgba(0,163,255,.32);
+      animation: logoPulse 3.8s ease-in-out infinite;
     }
-    .nav-link { color: var(--muted); font-weight: 600; font-size: 14px; }
+    @keyframes logoPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(0,163,255,.22); }
+      50% { box-shadow: 0 0 0 8px rgba(0,163,255,0); }
+    }
+    .nav-link { color: var(--muted); font-weight: 600; font-size: 14px; position: relative; }
+    .nav-link::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 100%;
+      bottom: -8px;
+      height: 2px;
+      background: var(--blue);
+      transition: right .22s ease;
+    }
     .nav-link:hover { color: var(--text); }
+    .nav-link:hover::after { right: 0; }
     .btn-andina {
       border: 0;
-      background: var(--green);
+      background: var(--blue);
       color: #fff;
       border-radius: 8px;
       font-weight: 700;
       padding: 10px 16px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 12px 26px rgba(0,163,255,.22);
+      transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
     }
-    .btn-andina:hover { background: #02bd66; color: #fff; }
+    .btn-andina::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,.24) 45%, transparent 70%);
+      transform: translateX(-120%);
+      transition: transform .65s ease;
+    }
+    .btn-andina:hover { background: #0b8fe8; color: #fff; transform: translateY(-2px); box-shadow: 0 16px 32px rgba(0,163,255,.32); }
+    .btn-andina:hover::after { transform: translateX(120%); }
     .btn-ghost {
       border: 1px solid var(--line);
       color: var(--text);
       border-radius: 8px;
       font-weight: 700;
       padding: 9px 16px;
+      background: rgba(255,255,255,.035);
+      transition: transform .2s ease, background .2s ease, border-color .2s ease;
     }
-    .btn-ghost:hover { border-color: rgba(255,255,255,.28); color: #fff; }
+    .btn-ghost:hover { border-color: rgba(255,255,255,.28); color: #fff; background: rgba(255,255,255,.08); transform: translateY(-2px); }
     .hero {
       min-height: calc(100vh - 70px);
       display: grid;
@@ -74,7 +108,10 @@
       overflow: hidden;
       background:
         linear-gradient(90deg, rgba(7,17,31,.98) 0%, rgba(7,17,31,.82) 46%, rgba(7,17,31,.30) 100%),
+        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px),
         url("assets/img/landing-warehouse-hero.png") center right/cover no-repeat;
+      background-size: auto, 54px 54px, 54px 54px, cover;
     }
     .motion-lines {
       position: absolute;
@@ -120,6 +157,7 @@
       font-weight: 700;
       background: rgba(0,168,89,.1);
       margin-bottom: 18px;
+      animation: fadeUp .7s cubic-bezier(.2,.8,.2,1) both;
     }
     h1 {
       font-size: clamp(42px, 7vw, 82px);
@@ -129,6 +167,17 @@
       max-width: 850px;
       margin: 0 0 22px;
       animation: titleEnter .85s cubic-bezier(.2,.8,.2,1) both;
+      text-shadow: 0 14px 42px rgba(0,0,0,.45);
+      background: linear-gradient(90deg, #ffffff 0%, #8be7ff 34%, #8dffbd 58%, #ffffff 100%);
+      background-size: 220% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: titleEnter .85s cubic-bezier(.2,.8,.2,1) both, titleShine 5.5s ease-in-out 1s infinite;
+    }
+    @keyframes titleShine {
+      0%, 100% { background-position: 0% center; }
+      50% { background-position: 100% center; }
     }
     @keyframes titleEnter {
       from { opacity: 0; transform: translateY(24px); filter: blur(8px); }
@@ -140,22 +189,44 @@
       font-size: 18px;
       line-height: 1.65;
       margin-bottom: 30px;
+      animation: fadeUp .75s cubic-bezier(.2,.8,.2,1) .18s both;
+    }
+    .lead .word {
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(12px);
+      animation: wordIn .55s cubic-bezier(.2,.8,.2,1) forwards;
+    }
+    @keyframes wordIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .hero .d-flex.flex-wrap.gap-2 { animation: fadeUp .75s cubic-bezier(.2,.8,.2,1) .28s both; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     .metric-strip {
       border-top: 1px solid var(--line);
       border-bottom: 1px solid var(--line);
       background: rgba(15,28,46,.62);
+      backdrop-filter: blur(14px);
     }
     .metric {
       padding: 22px 0;
+      animation: fadeUp .7s ease both;
     }
-    .metric strong { font-size: 28px; color: #fff; display: block; }
+    .metric:nth-child(2) { animation-delay: .08s; }
+    .metric:nth-child(3) { animation-delay: .16s; }
+    .metric strong { font-size: 28px; color: #fff; display: block; text-shadow: 0 0 18px rgba(0,163,255,.22); }
     .metric span { color: var(--muted); font-size: 13px; }
     section { padding: 72px 0; }
     .section-title {
       font-weight: 850;
       font-size: clamp(28px, 4vw, 44px);
       margin-bottom: 10px;
+      opacity: 0;
+      transform: translateY(14px);
+      animation: fadeUp .7s ease forwards;
     }
     .section-copy { color: var(--muted); max-width: 660px; }
     .feature {
@@ -164,8 +235,26 @@
       border-radius: 8px;
       padding: 22px;
       height: 100%;
+      position: relative;
+      overflow: hidden;
+      transition: transform .24s ease, border-color .24s ease, box-shadow .24s ease;
+      opacity: 0;
+      transform: translateY(18px);
     }
-    .feature i { color: var(--blue); font-size: 28px; margin-bottom: 16px; display: inline-block; }
+    .feature::before, .catalog-panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-top: 1px solid rgba(255,255,255,.16);
+      pointer-events: none;
+    }
+    .feature:hover {
+      transform: translateY(-6px);
+      border-color: rgba(0,163,255,.45);
+      box-shadow: 0 18px 45px rgba(0,0,0,.26);
+    }
+    .feature i { color: var(--blue); font-size: 28px; margin-bottom: 16px; display: inline-block; transition: transform .24s ease; }
+    .feature:hover i { transform: translateY(-2px) scale(1.08); }
     .feature h3 { font-size: 17px; margin-bottom: 8px; }
     .feature p { color: var(--muted); margin: 0; font-size: 14px; line-height: 1.55; }
     .catalog-panel {
@@ -173,6 +262,9 @@
       background: linear-gradient(180deg, rgba(19,36,58,.64), rgba(15,28,46,.38));
       border-radius: 8px;
       padding: 20px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 18px 55px rgba(0,0,0,.22);
     }
     .catalog-toolbar {
       display: flex;
@@ -189,7 +281,10 @@
       border-radius: 8px;
       padding: 11px 14px;
       min-width: min(100%, 320px);
+      outline: none;
+      transition: border-color .2s ease, box-shadow .2s ease;
     }
+    .search:focus { border-color: rgba(0,163,255,.58); box-shadow: 0 0 0 4px rgba(0,163,255,.12); }
     .search::placeholder { color: #64748b; }
     .catalog-meta {
       color: var(--muted);
@@ -209,11 +304,34 @@
       display: flex;
       flex-direction: column;
       box-shadow: 0 14px 30px rgba(0,0,0,.18);
-      transition: transform .2s ease, border-color .2s ease;
+      opacity: 0;
+      animation: cardIn .55s ease forwards;
+      transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+      position: relative;
+    }
+    .product-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,.08) 42%, transparent 70%);
+      transform: translateX(-120%);
+      pointer-events: none;
+    }
+    .product-card:hover::after { animation: sweep .9s ease; }
+    @keyframes sweep {
+      to { transform: translateX(120%); }
+    }
+    #gridProductos > div:nth-child(2n) .product-card { animation-delay: .05s; }
+    #gridProductos > div:nth-child(3n) .product-card { animation-delay: .1s; }
+    #gridProductos > div:nth-child(4n) .product-card { animation-delay: .15s; }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     .product-card:hover {
-      transform: translateY(-4px);
-      border-color: rgba(0,168,89,.52);
+      transform: translateY(-7px);
+      border-color: rgba(0,163,255,.52);
+      box-shadow: 0 22px 48px rgba(0,0,0,.28);
     }
     .product-img {
       height: 178px;
@@ -224,7 +342,8 @@
       place-items: center;
       overflow: hidden;
     }
-    .product-img img { width: 100%; height: 100%; object-fit: contain; padding: 12px; }
+    .product-img img { width: 100%; height: 100%; object-fit: contain; padding: 12px; transition: transform .28s ease; }
+    .product-card:hover .product-img img { transform: scale(1.04); }
     .product-placeholder { font-size: 48px; font-weight: 900; color: rgba(255,255,255,.18); }
     .product-body { padding: 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
     .product-cat { color: #8be7ff; font-size: 12px; font-weight: 800; text-transform: uppercase; }
@@ -245,8 +364,37 @@
       background: linear-gradient(135deg, rgba(0,168,89,.18), rgba(0,163,255,.16));
       border-top: 1px solid var(--line);
       border-bottom: 1px solid var(--line);
+      position: relative;
+      overflow: hidden;
     }
+    .cta-band::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(115deg, rgba(255,255,255,.05) 0 1px, transparent 1px 26px);
+      opacity: .42;
+      pointer-events: none;
+    }
+    .cta-band .container { position: relative; z-index: 1; }
+    .reveal {
+      opacity: 0;
+      transform: translateY(22px);
+      transition: opacity .7s ease, transform .7s ease;
+    }
+    .reveal.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .feature.reveal.is-visible:hover {
+      transform: translateY(-6px);
+    }
+    .reveal.is-visible:nth-child(2) { transition-delay: .08s; }
+    .reveal.is-visible:nth-child(3) { transition-delay: .16s; }
     footer { color: var(--muted); border-top: 1px solid var(--line); padding: 34px 0; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+      .reveal { opacity: 1 !important; transform: none !important; }
+    }
     @media (max-width: 768px) {
       .hero { min-height: auto; }
       .hero-inner { padding: 52px 0 84px; }
@@ -289,9 +437,9 @@
     <div class="container hero-inner">
       <span class="eyebrow"><i class="bi bi-truck"></i> Entrega mayorista para negocios en Bolivia</span>
       <h1>Distribuidora Andina SRL</h1>
-      <p class="lead">Compra productos para tu tienda, revisa disponibilidad real y gestiona pedidos con una plataforma conectada al inventario del ERP.</p>
+      <p class="lead" id="heroLead">Compra productos para tu tienda, revisa disponibilidad real y gestiona pedidos con una plataforma conectada al inventario del ERP.</p>
       <div class="d-flex flex-wrap gap-2">
-        <a class="btn-andina" href="cliente/registro.html"><i class="bi bi-person-plus me-1"></i> Registrarme como cliente</a>
+        <a class="btn-andina" href="registro.html"><i class="bi bi-person-plus me-1"></i> Registrarme como cliente</a>
         <a class="btn-ghost" href="#catalogo"><i class="bi bi-bag me-1"></i> Ver productos</a>
         <a class="btn-ghost" href="login.html"><i class="bi bi-box-arrow-in-right me-1"></i> Iniciar sesion</a>
       </div>
@@ -316,21 +464,21 @@
       </div>
       <div class="row g-3">
         <div class="col-md-4">
-          <div class="feature">
+          <div class="feature reveal">
             <i class="bi bi-box-seam"></i>
             <h3>Inventario conectado</h3>
             <p>El catalogo se carga desde la misma API usada por la tienda del cliente.</p>
           </div>
         </div>
         <div class="col-md-4">
-          <div class="feature">
+          <div class="feature reveal">
             <i class="bi bi-receipt"></i>
             <h3>Pedidos listos</h3>
             <p>Los clientes pueden comprar desde la tienda y el stock se descuenta al confirmar.</p>
           </div>
         </div>
         <div class="col-md-4">
-          <div class="feature">
+          <div class="feature reveal">
             <i class="bi bi-shield-check"></i>
             <h3>Acceso claro</h3>
             <p>Botones directos a registro, login y tienda, usando rutas locales del proyecto.</p>
@@ -360,7 +508,7 @@
           </div>
         </div>
         <div class="text-center mt-4">
-          <a class="btn-andina" href="cliente/registro.html">Comprar desde la tienda</a>
+          <a class="btn-andina" href="registro.html">Comprar desde la tienda</a>
         </div>
       </div>
     </div>
@@ -374,7 +522,7 @@
           <p class="section-copy mb-0">Registrate, arma tu carrito y controla tus pedidos desde la plataforma de Distribuidora Andina.</p>
         </div>
         <div class="col-lg-4 text-lg-end">
-          <a class="btn-andina" href="cliente/registro.html">Empezar ahora</a>
+          <a class="btn-andina" href="https://wa.me/59169713359?text=Hola,%20quiero%20informacion%20sobre%20Distribuidora%20Andina" target="_blank" rel="noopener"><i class="bi bi-whatsapp me-1"></i> WhatsApp</a>
         </div>
       </div>
     </div>
@@ -393,6 +541,32 @@
     const search = document.getElementById('buscarProducto');
     const catalogMeta = document.getElementById('catalogMeta');
     let productos = [];
+
+    function activarAnimacionesLanding() {
+      const lead = document.getElementById('heroLead');
+      if (lead && !lead.dataset.animated) {
+        const words = lead.textContent.trim().split(/\s+/);
+        lead.innerHTML = words.map((word, index) =>
+          `<span class="word" style="animation-delay:${0.32 + index * 0.035}s">${escapeHtml(word)}</span>`
+        ).join(' ');
+        lead.dataset.animated = 'true';
+      }
+
+      const items = document.querySelectorAll('.reveal');
+      if (!('IntersectionObserver' in window)) {
+        items.forEach(el => el.classList.add('is-visible'));
+        return;
+      }
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.18 });
+      items.forEach(el => observer.observe(el));
+    }
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -473,6 +647,7 @@
       renderProductos(filtrados);
     });
 
+    activarAnimacionesLanding();
     cargarProductos();
   </script>
 </body>

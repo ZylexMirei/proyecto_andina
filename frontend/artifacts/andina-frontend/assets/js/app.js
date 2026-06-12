@@ -384,8 +384,19 @@ function formatFechaCorta(fecha) {
 
 function formatDateTime(fecha) {
   if (!fecha) return '—';
+  const raw = String(fecha).trim();
+  const mysql = raw.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (mysql) {
+    return `${mysql[3]}/${mysql[2]}/${mysql[1]}, ${mysql[4]}:${mysql[5]}:${mysql[6] || '00'}`;
+  }
   const d = new Date(fecha);
-  return d.toLocaleString('es-BO');
+  if (Number.isNaN(d.getTime())) return raw;
+  return d.toLocaleString('es-BO', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+    timeZone: 'America/La_Paz',
+  });
 }
 
 // ===================== BADGE STATUS =====================
@@ -395,7 +406,7 @@ function getBadgeEstado(estado) {
     'Pendiente': 'badge-pendiente', 'pendiente': 'badge-pendiente',
     'Aprobado': 'badge-aprobado', 'aprobado': 'badge-aprobado',
     'Rechazado': 'badge-rechazado', 'rechazado': 'badge-rechazado',
-    'Crítico': 'badge-critico', 'critico': 'badge-critico',
+    'Crítico': 'badge-critico', 'Critico': 'badge-critico', 'critico': 'badge-critico',
     'Normal': 'badge-normal', 'normal': 'badge-normal',
     'Alerta': 'badge-alerta', 'alerta': 'badge-alerta',
     'Agotado': 'badge-agotado', 'agotado': 'badge-agotado',

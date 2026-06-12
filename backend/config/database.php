@@ -28,6 +28,7 @@ class Database {
                 PDO::ATTR_EMULATE_PREPARES   => false,
             ];
             $this->conn = new PDO($dsn, $this->username, $this->password, $options);
+            $this->conn->exec("SET time_zone = '-04:00'");
         } catch (PDOException $exception) {
             // En lugar de matar la ejecución, relanzar la excepción para que el script que llama la maneje.
             throw new PDOException("Error de conexión a la base de datos: " . $exception->getMessage(), (int)$exception->getCode());

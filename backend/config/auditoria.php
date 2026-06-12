@@ -1,6 +1,7 @@
 <?php
 
 require_once 'mongodb.php';
+date_default_timezone_set('America/La_Paz');
 
 function registrarAuditoria(
     $usuario,

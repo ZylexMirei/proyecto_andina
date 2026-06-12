@@ -121,8 +121,8 @@ async function cargarBitacoraReal() {
     renderLogs(logs);
     
     // Actualizar las tarjetas de estadísticas (KPIs) de arriba
-    const hoy = new Date().toLocaleDateString('es-BO');
-    const exitososHoy = logs.filter(l => l.resultado === 'Éxito' && new Date(l.fecha).toLocaleDateString('es-BO') === hoy).length;
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' });
+    const exitososHoy = logs.filter(l => l.resultado === 'Éxito' && String(l.fecha || '').slice(0, 10) === hoy).length;
     const fallidos = logs.filter(l => l.resultado === 'Fallido').length;
     document.querySelectorAll('.stat-number')[0].textContent = exitososHoy;
     document.querySelectorAll('.stat-number')[1].textContent = fallidos;
