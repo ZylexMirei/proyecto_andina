@@ -1970,11 +1970,15 @@ switch ($accion) {
         try {
             $db = (new Database())->getConnection();
             // Obtenemos los últimos 1000 accesos ordenados por el más reciente
-            $orderCol = columnaExiste($db, 'log_accesos', 'fecha_hora') ? 'fecha_hora'
-                : (columnaExiste($db, 'log_accesos', 'fecha') ? 'fecha'
-                : (columnaExiste($db, 'log_accesos', 'created_at') ? 'created_at'
-                : (columnaExiste($db, 'log_accesos', 'id_log') ? 'id_log' : 'id')));
-            $stmt = $db->prepare("SELECT * FROM log_accesos ORDER BY `{$orderCol}` DESC LIMIT 1000");
+            $orderCol = null;
+            foreach (['fecha_hora', 'fecha', 'created_at', 'creado_en', 'fecha_acceso', 'timestamp', 'id_log', 'id_acceso', 'id_log_acceso', 'id_login'] as $candidate) {
+                if (columnaExiste($db, 'log_accesos', $candidate)) {
+                    $orderCol = $candidate;
+                    break;
+                }
+            }
+            $orderSql = $orderCol ? " ORDER BY `{$orderCol}` DESC" : "";
+            $stmt = $db->prepare("SELECT * FROM log_accesos{$orderSql} LIMIT 1000");
             $stmt->execute();
 
             $logs = array_map(function($l) {
@@ -1983,7 +1987,7 @@ switch ($accion) {
                     $resultado = (isset($l['exito']) && (int) $l['exito'] === 1) ? 'Éxito' : 'Fallido';
                 }
                 return [
-                    'id' => $l['id_log'] ?? $l['id'] ?? 0,
+                    'id' => $l['id_log'] ?? $l['id_acceso'] ?? $l['id_log_acceso'] ?? $l['id_login'] ?? $l['id'] ?? 0,
                     'usuario' => $l['username'] ?? $l['usuario'] ?? 'Desconocido',
                     'ip' => $l['ip_address'] ?? $l['ip'] ?? '0.0.0.0',
                     'resultado' => $resultado,
@@ -2129,6 +2133,27 @@ switch ($accion) {
             }
             unset($pedido);
 
+            try {
+                $compStmt = $db->prepare(
+                    "SELECT id_comprobante, referencia, archivo, mime, estado, fecha_subida
+                     FROM comprobantes_pago
+                     WHERE id_pedido = :id
+                     ORDER BY fecha_subida DESC, id_comprobante DESC
+                     LIMIT 1"
+                );
+                foreach ($pedidos as &$pedido) {
+                    $compStmt->bindValue(':id', $pedido['id'], PDO::PARAM_INT);
+                    $compStmt->execute();
+                    $pedido['comprobante'] = $compStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+                }
+                unset($pedido);
+            } catch (Throwable $e) {
+                foreach ($pedidos as &$pedido) {
+                    $pedido['comprobante'] = null;
+                }
+                unset($pedido);
+            }
+
             echo json_encode(["exito" => true, "pedidos" => $pedidos], JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
             echo json_encode(["error" => $e->getMessage()]);
@@ -2155,6 +2180,180 @@ switch ($accion) {
             $stmt->execute();
 
             echo json_encode(["exito" => true, "mensaje" => "Estado actualizado"], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    // ==================== CANCELAR PEDIDO CLIENTE ====================
+    case 'cancelar_pedido_cliente':
+        requireApiAuth(['Cliente']);
+
+        $id_pedido = intval($data['id_pedido'] ?? $data['id'] ?? 0);
+        if ($id_pedido <= 0) {
+            echo json_encode(["error" => "ID de pedido invalido"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $id_usuario = (int) $_SESSION['id_usuario'];
+
+            $stmtC = $db->prepare("SELECT c.id_cliente FROM usuarios u INNER JOIN clientes c ON u.email = c.email WHERE u.id_usuario = :idu LIMIT 1");
+            $stmtC->bindValue(':idu', $id_usuario, PDO::PARAM_INT);
+            $stmtC->execute();
+            $id_cliente = (int) $stmtC->fetchColumn();
+
+            if ($id_cliente <= 0) {
+                echo json_encode(["error" => "No se encontro el cliente de esta sesion"]); exit();
+            }
+
+            $stmt = $db->prepare("UPDATE pedidos SET estado = 'Cancelado' WHERE id_pedido = :id AND id_cliente = :idc AND estado = 'Pendiente'");
+            $stmt->bindValue(':id', $id_pedido, PDO::PARAM_INT);
+            $stmt->bindValue(':idc', $id_cliente, PDO::PARAM_INT);
+            $stmt->execute();
+
+            if ($stmt->rowCount() <= 0) {
+                echo json_encode(["error" => "Solo puedes cancelar pedidos pendientes propios"]); exit();
+            }
+
+            echo json_encode(["exito" => true, "mensaje" => "Pedido cancelado"], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    // ==================== SUBIR COMPROBANTE DE PAGO ====================
+    case 'subir_comprobante_pago':
+        requireApiAuth(['Cliente']);
+
+        $id_pedido = intval($_POST['id_pedido'] ?? 0);
+        $referencia_pago = sanitizar_input($_POST['referencia_pago'] ?? '');
+
+        if ($id_pedido <= 0) {
+            echo json_encode(["error" => "ID de pedido invalido"]); exit();
+        }
+        if (empty($_FILES['comprobante']) || $_FILES['comprobante']['error'] !== UPLOAD_ERR_OK) {
+            echo json_encode(["error" => "Sube un comprobante valido"]); exit();
+        }
+
+        $file = $_FILES['comprobante'];
+        if ($file['size'] > 5 * 1024 * 1024) {
+            echo json_encode(["error" => "El comprobante no debe superar 5 MB"]); exit();
+        }
+
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($file['tmp_name']);
+        $extensiones = [
+            'image/png' => 'png',
+            'image/jpeg' => 'jpg',
+            'image/webp' => 'webp',
+            'application/pdf' => 'pdf'
+        ];
+
+        if (!isset($extensiones[$mime])) {
+            echo json_encode(["error" => "Formato no permitido. Usa PNG, JPG, WEBP o PDF"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $id_usuario = (int) $_SESSION['id_usuario'];
+
+            $stmtC = $db->prepare("SELECT c.id_cliente FROM usuarios u INNER JOIN clientes c ON u.email = c.email WHERE u.id_usuario = :idu LIMIT 1");
+            $stmtC->bindValue(':idu', $id_usuario, PDO::PARAM_INT);
+            $stmtC->execute();
+            $id_cliente = (int) $stmtC->fetchColumn();
+
+            $stmtP = $db->prepare("SELECT id_pedido, codigo_pedido FROM pedidos WHERE id_pedido = :idp AND id_cliente = :idc LIMIT 1");
+            $stmtP->bindValue(':idp', $id_pedido, PDO::PARAM_INT);
+            $stmtP->bindValue(':idc', $id_cliente, PDO::PARAM_INT);
+            $stmtP->execute();
+            $pedido = $stmtP->fetch(PDO::FETCH_ASSOC);
+
+            if (!$pedido) {
+                echo json_encode(["error" => "No puedes subir comprobante para este pedido"]); exit();
+            }
+
+            $uploadDir = __DIR__ . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'comprobantes';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0775, true);
+            }
+
+            $codigoLimpio = preg_replace('/[^A-Za-z0-9_-]/', '_', $pedido['codigo_pedido']);
+            $nombreArchivo = $codigoLimpio . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $extensiones[$mime];
+            $destino = $uploadDir . DIRECTORY_SEPARATOR . $nombreArchivo;
+
+            if (!move_uploaded_file($file['tmp_name'], $destino)) {
+                echo json_encode(["error" => "No se pudo guardar el comprobante"]); exit();
+            }
+
+            $rutaRelativa = 'uploads/comprobantes/' . $nombreArchivo;
+            try {
+                $db->query("CREATE TABLE IF NOT EXISTS comprobantes_pago (
+                    id_comprobante INT AUTO_INCREMENT PRIMARY KEY,
+                    id_pedido INT NOT NULL,
+                    referencia VARCHAR(120) NULL,
+                    archivo VARCHAR(255) NOT NULL,
+                    mime VARCHAR(80) NOT NULL,
+                    estado VARCHAR(30) NOT NULL DEFAULT 'Pendiente',
+                    fecha_subida DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+                $stmtIns = $db->prepare("INSERT INTO comprobantes_pago (id_pedido, referencia, archivo, mime, estado) VALUES (:idp, :ref, :archivo, :mime, 'Pendiente')");
+                $stmtIns->bindValue(':idp', $id_pedido, PDO::PARAM_INT);
+                $stmtIns->bindValue(':ref', $referencia_pago);
+                $stmtIns->bindValue(':archivo', $rutaRelativa);
+                $stmtIns->bindValue(':mime', $mime);
+                $stmtIns->execute();
+            } catch (Throwable $e) {}
+
+            echo json_encode([
+                "exito" => true,
+                "mensaje" => "Comprobante guardado",
+                "archivo" => $rutaRelativa,
+                "estado" => "Pendiente"
+            ], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+        break;
+
+    // ==================== VER COMPROBANTE DE PAGO ====================
+    case 'ver_comprobante_pago':
+        requireApiAuth(['Administrador', 'Gerente']);
+
+        $id_comprobante = intval($_GET['id_comprobante'] ?? $data['id_comprobante'] ?? 0);
+        if ($id_comprobante <= 0) {
+            echo json_encode(["error" => "ID de comprobante invalido"]); exit();
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $stmt = $db->prepare("SELECT archivo, mime FROM comprobantes_pago WHERE id_comprobante = :id LIMIT 1");
+            $stmt->bindValue(':id', $id_comprobante, PDO::PARAM_INT);
+            $stmt->execute();
+            $comp = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$comp || empty($comp['archivo'])) {
+                echo json_encode(["error" => "Comprobante no encontrado"]); exit();
+            }
+
+            $baseDir = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'comprobantes');
+            $archivoRel = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, basename($comp['archivo']));
+            if (strpos($comp['archivo'], 'uploads') !== false) {
+                $archivoRel = basename($comp['archivo']);
+            }
+            $filePath = realpath($baseDir . DIRECTORY_SEPARATOR . $archivoRel);
+
+            if (!$baseDir || !$filePath || strpos($filePath, $baseDir) !== 0 || !is_file($filePath)) {
+                echo json_encode(["error" => "Archivo de comprobante no disponible"]); exit();
+            }
+
+            header_remove('Content-Type');
+            header('Content-Type: ' . ($comp['mime'] ?: 'application/octet-stream'));
+            header('Content-Disposition: inline; filename="' . basename($filePath) . '"');
+            header('Content-Length: ' . filesize($filePath));
+            readfile($filePath);
+            exit();
         } catch (Throwable $e) {
             echo json_encode(["error" => $e->getMessage()]);
         }
@@ -2489,6 +2688,56 @@ switch ($accion) {
             }
             $pedidos = $stmtP->fetchAll();
 
+            // Si el pedido quedo asociado al usuario creador pero no al id_cliente,
+            // igual debe aparecer en "Mis pedidos".
+            try {
+                $col_usuario = 'id_usuario';
+                try { $db->query("SELECT id_usuario_creador FROM pedidos LIMIT 1"); $col_usuario = 'id_usuario_creador'; } catch (Throwable $e) {}
+
+                $idsVistos = [];
+                foreach ($pedidos as $pedExistente) {
+                    $idsVistos[(int) $pedExistente['id']] = true;
+                }
+
+                try {
+                    $stmtExtra = $db->prepare("SELECT id_pedido as id, codigo_pedido as codigo, fecha_pedido as fecha, estado, total, '3 a 5 dias habiles' as entrega_est FROM pedidos WHERE $col_usuario = :idu ORDER BY fecha_pedido DESC, id_pedido DESC");
+                    $stmtExtra->bindValue(':idu', $id_usuario, PDO::PARAM_INT);
+                    $stmtExtra->execute();
+                } catch (Throwable $e) {
+                    $stmtExtra = $db->prepare("SELECT p.id_pedido as id, p.codigo_pedido as codigo, p.fecha_pedido as fecha, p.estado, '3 a 5 dias habiles' as entrega_est, COALESCE((SELECT SUM(cantidad * precio_unitario) FROM detalle_pedido WHERE id_pedido = p.id_pedido), 0) as total FROM pedidos p WHERE p.$col_usuario = :idu ORDER BY p.fecha_pedido DESC, p.id_pedido DESC");
+                    $stmtExtra->bindValue(':idu', $id_usuario, PDO::PARAM_INT);
+                    $stmtExtra->execute();
+                }
+
+                foreach ($stmtExtra->fetchAll() as $pedExtra) {
+                    $idExtra = (int) $pedExtra['id'];
+                    if (!isset($idsVistos[$idExtra])) {
+                        $pedidos[] = $pedExtra;
+                        $idsVistos[$idExtra] = true;
+                    }
+                }
+
+                usort($pedidos, function ($a, $b) {
+                    $fechaCmp = strcmp((string) ($b['fecha'] ?? ''), (string) ($a['fecha'] ?? ''));
+                    return $fechaCmp !== 0 ? $fechaCmp : ((int) ($b['id'] ?? 0) <=> (int) ($a['id'] ?? 0));
+                });
+            } catch (Throwable $e) {}
+
+            try {
+                $stmtMetodo = $db->prepare("SELECT metodo_pago FROM pedidos WHERE id_pedido = :idp LIMIT 1");
+                foreach ($pedidos as &$pedMetodo) {
+                    $stmtMetodo->bindValue(':idp', $pedMetodo['id']);
+                    $stmtMetodo->execute();
+                    $pedMetodo['metodo_pago'] = $stmtMetodo->fetchColumn() ?: 'No registrado';
+                }
+                unset($pedMetodo);
+            } catch (Throwable $e) {
+                foreach ($pedidos as &$pedMetodo) {
+                    $pedMetodo['metodo_pago'] = $pedMetodo['metodo_pago'] ?? 'No registrado';
+                }
+                unset($pedMetodo);
+            }
+
             // 3. Traer los items (detalle_pedido) por cada pedido
             $stmtI = $db->prepare("SELECT p.nombre, dp.cantidad, dp.precio_unitario as precio FROM detalle_pedido dp JOIN productos p ON dp.id_producto = p.id_producto WHERE dp.id_pedido = :idp");
 
@@ -2512,6 +2761,10 @@ switch ($accion) {
         $items = normalizarItemsPedido($data['items'] ?? []);
         $total = floatval($data['total'] ?? 0);
         $metodo_pago = sanitizar_input($data['metodo_pago'] ?? 'Efectivo');
+        $referencia_pago = sanitizar_input($data['referencia_pago'] ?? '');
+        if ($referencia_pago !== '') {
+            $metodo_pago .= " - Ref: " . $referencia_pago;
+        }
 
         if (empty($items)) {
             echo json_encode(["error" => "Agrega al menos un producto al pedido"]); exit();
@@ -2610,7 +2863,14 @@ switch ($accion) {
                 // Ignorar si el correo falla, el pedido ya se guardó con éxito
             }
 
-            echo json_encode(["exito" => true]);
+            echo json_encode([
+                "exito" => true,
+                "id_pedido" => (int) $id_pedido,
+                "codigo_pedido" => $codigo,
+                "estado" => "Pendiente",
+                "metodo_pago" => $metodo_pago,
+                "total" => round($total, 2)
+            ], JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
             if (isset($db)) $db->rollBack();
             echo json_encode(["error" => "Error guardando el pedido: " . $e->getMessage()]);

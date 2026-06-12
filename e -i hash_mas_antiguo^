@@ -1,0 +1,6 @@
+21a3230 2026-05-02 correccion en el cotigo otp(error de envio de correo    )
+241eafb 2026-05-02 Corregir flujo registro/OTP/login: alias API, SMTP remitente, verificación por email
+3380447 2026-05-02 Alias enviarOTP hacia enviarCorreoOTP para registro/OTP vía test_api
+7374233 2026-05-02 cambio en el inicio del proyecto
+ca4aaeb 2026-05-02 Arreglo carga de env (getEnv), TypeScript en frontend y ajustes de pruebas
+6abcded 2026-05-02 ERP Distribuidora Andina: backend PHP, frontend Vite, documentación unificada

@@ -25,9 +25,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       creado_por: p.creador_nombre || p.creado_por,
       id_usuario: parseInt(p.id_usuario_creador || p.id_usuario)
     }));
-    const codigosReales = new Set(pedidosReales.map(p => p.codigo));
-    const pedidosSimuladosFiltrados = Andina.MOCK_DATA.pedidos.filter(p => !codigosReales.has(p.codigo));
-    Andina.MOCK_DATA.pedidos = [...pedidosReales, ...pedidosSimuladosFiltrados];
+    const pedidosBase = pedidosReales.length ? pedidosReales : Andina.MOCK_DATA.pedidos;
+    Andina.MOCK_DATA.pedidos = pedidosBase.sort((a,b) => {
+      const fechaCmp = String(b.fecha || '').localeCompare(String(a.fecha || ''));
+      return fechaCmp || (Number(b.id || 0) - Number(a.id || 0));
+    });
   }
 
   buildDashboard(session.rol, session);

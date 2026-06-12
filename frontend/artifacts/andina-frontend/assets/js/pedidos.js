@@ -24,14 +24,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       total: parseFloat(p.total_pedido || p.total) || 0,
       creado_por: p.creador_nombre || p.creado_por,
       id_usuario: parseInt(p.id_usuario_creador || p.id_usuario) || 0,
+      comprobante: p.comprobante || null,
       detalles: Array.isArray(p.detalles) ? p.detalles : []
     }));
   }
   
-  // Combinar los pedidos simulados de muestra con los reales
-  const codigosReales = new Set(pedidosReales.map(p => p.codigo));
-  const pedidosSimuladosFiltrados = Andina.MOCK_DATA.pedidos.filter(p => !codigosReales.has(p.codigo));
-  pedidosData = [...pedidosReales, ...pedidosSimuladosFiltrados];
+  // Si hay datos reales, no mezclamos pedidos de muestra para evitar que oculten los pedidos nuevos.
+  const pedidosBase = pedidosReales.length ? pedidosReales : Andina.MOCK_DATA.pedidos;
+  pedidosData = pedidosBase.sort((a,b) => {
+    const fechaCmp = String(b.fecha || '').localeCompare(String(a.fecha || ''));
+    return fechaCmp || (Number(b.id || 0) - Number(a.id || 0));
+  });
 
   let pedidos = pedidosData;
   // Empleado solo ve sus pedidos
@@ -65,6 +68,10 @@ function renderPedidos(pedidos, rol) {
       }
     }
 
+    const comprobanteBadge = p.comprobante
+      ? `<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-receipt-cutoff me-1"></i>Comprobante</span>`
+      : `<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle"><i class="bi bi-dash-circle me-1"></i>Sin comprobante</span>`;
+
     const acciones = `<div class="d-flex gap-1">
       <button class="btn btn-outline-primary btn-xs" onclick="verDetallePedido(${p.id})" title="Ver detalle"><i class="bi bi-eye"></i></button>
       ${stateActions}
@@ -73,10 +80,10 @@ function renderPedidos(pedidos, rol) {
     return `<tr>
       <td><code style="font-size:12px;color:var(--primary);">${p.codigo}</code></td>
       <td><strong>${p.cliente}</strong></td>
-      <td>${Andina.formatFechaCorta(p.fecha)}</td>
+      <td data-order="${String(p.fecha || '')}-${String(p.id || 0).padStart(10, '0')}">${Andina.formatFechaCorta(p.fecha)}</td>
       <td>${Andina.getBadgeEstado(p.estado)}</td>
       <td><strong>${Andina.formatBs(p.total)}</strong></td>
-      <td><span style="font-size:12.5px;color:#718096;">${p.creado_por}</span></td>
+      <td><div style="font-size:12.5px;color:#718096;">${p.creado_por}</div>${comprobanteBadge}</td>
       <td>${acciones}</td>
     </tr>`;
   }).join('');
@@ -162,6 +169,24 @@ function verDetallePedido(id) {
     </tr>`;
   }).join('');
 
+  const comprobanteHtml = p.comprobante
+    ? `<div class="mt-3 p-3 rounded" style="border:1px solid rgba(0,198,255,.18);background:rgba(0,198,255,.06);">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <div class="fw-semibold" style="color:var(--primary);"><i class="bi bi-receipt-cutoff me-1"></i>Comprobante de pago</div>
+            <div style="font-size:12.5px;color:#64748b;">Referencia: <strong>${p.comprobante.referencia || 'Sin referencia'}</strong></div>
+            <div style="font-size:12.5px;color:#64748b;">Estado: <strong>${p.comprobante.estado || 'Pendiente'}</strong></div>
+            <div style="font-size:12.5px;color:#64748b;">Subido: <strong>${Andina.formatDateTime(p.comprobante.fecha_subida)}</strong></div>
+          </div>
+          <a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" href="/test_api.php?accion=ver_comprobante_pago&id_comprobante=${p.comprobante.id_comprobante}">
+            <i class="bi bi-box-arrow-up-right me-1"></i>Ver archivo
+          </a>
+        </div>
+      </div>`
+    : `<div class="mt-3 p-3 rounded text-muted" style="border:1px dashed rgba(100,116,139,.35);background:rgba(100,116,139,.06);font-size:13px;">
+        <i class="bi bi-info-circle me-1"></i>Este pedido todavia no tiene comprobante subido.
+      </div>`;
+
   Swal.fire({
     title: p.codigo,
     width: 600,
@@ -178,6 +203,7 @@ function verDetallePedido(id) {
           <tbody>${items}</tbody>
           <tfoot><tr><td colspan="3" class="text-end fw-bold">Total</td><td><strong style="color:var(--accent);font-size:15px;">${Andina.formatBs(p.total)}</strong></td></tr></tfoot>
         </table>
+        ${comprobanteHtml}
       </div>`,
     showDenyButton: true,
     confirmButtonText: '<i class="bi bi-printer me-1"></i> Imprimir Recibo',

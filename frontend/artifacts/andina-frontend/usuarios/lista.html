@@ -12,6 +12,75 @@
     .mi-color-correo:hover {
       color: #93c5fd; /* Un tono aún más claro al pasar el mouse */
     }
+    .usuarios-card { overflow: hidden; }
+    .usuarios-table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+    }
+    #tablaUsuarios {
+      min-width: 1120px;
+      table-layout: fixed;
+    }
+    #tablaUsuarios th,
+    #tablaUsuarios td {
+      vertical-align: middle;
+      white-space: normal;
+    }
+    #tablaUsuarios th:nth-child(1), #tablaUsuarios td:nth-child(1) { width: 170px; }
+    #tablaUsuarios th:nth-child(2), #tablaUsuarios td:nth-child(2) { width: 190px; }
+    #tablaUsuarios th:nth-child(3), #tablaUsuarios td:nth-child(3) { width: 330px; }
+    #tablaUsuarios th:nth-child(4), #tablaUsuarios td:nth-child(4) { width: 145px; }
+    #tablaUsuarios th:nth-child(5), #tablaUsuarios td:nth-child(5) { width: 105px; }
+    #tablaUsuarios th:nth-child(6), #tablaUsuarios td:nth-child(6) { width: 110px; text-align:center; }
+    #tablaUsuarios th:nth-child(7), #tablaUsuarios td:nth-child(7) { width: 150px; }
+    #tablaUsuarios th:nth-child(8), #tablaUsuarios td:nth-child(8) { width: 120px; }
+    #tablaUsuarios tbody td { color: var(--text, #1e293b); }
+    #tablaUsuarios .user-name {
+      color: var(--text, #1e293b);
+      font-size: 13.5px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+    #tablaUsuarios .user-handle {
+      color: #64748b;
+      font-size: 12.5px;
+      font-family: monospace;
+      overflow-wrap: anywhere;
+    }
+    #tablaUsuarios .user-email {
+      display: inline-block;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      line-height: 1.45;
+    }
+    #tablaUsuarios .actions-cell .btn {
+      width: 36px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .dataTables_wrapper .row:first-child,
+    .dataTables_wrapper .row:last-child {
+      margin: 0;
+      padding: 12px 16px;
+      align-items: center;
+    }
+    .dataTables_wrapper .dataTables_filter input,
+    .dataTables_wrapper .dataTables_length select {
+      border-radius: 10px;
+      min-height: 38px;
+    }
+    @media (max-width: 768px) {
+      #main-content .page-header { align-items: stretch; }
+      .page-header .d-flex { width: 100%; }
+      .page-header select,
+      .page-header button { flex: 1 1 140px; }
+      #tablaUsuarios { min-width: 1040px; }
+    }
   </style>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -51,9 +120,9 @@
     <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon accent"><i class="bi bi-bag"></i></div><div class="stat-info"><div class="stat-number" id="cntCliente">0</div><div class="stat-label">Clientes</div></div></div></div>
   </div>
 
-  <div class="card">
+  <div class="card usuarios-card">
     <div class="card-body p-0">
-      <div class="table-responsive">
+      <div class="table-responsive usuarios-table-wrap">
         <table id="tablaUsuarios" class="table table-striped mb-0 w-100">
           <thead><tr><th>Usuario</th><th>Nombre completo</th><th>Email</th><th>Rol</th><th>Estado</th><th>Verificado</th><th>Último acceso</th><th>Acciones</th></tr></thead>
           <tbody id="tbodyUsuarios"></tbody>
@@ -163,15 +232,15 @@ function renderUsuarios(data) {
     return `<tr>
       <td><div class="d-flex align-items-center gap-2">
         <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--secondary),#c3d4f0);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:var(--primary);">${init}</div>
-        <span style="font-size:13px; color: #cbd5e1; font-family: monospace;">@${u.username}</span>
+        <span class="user-handle">@${u.username}</span>
       </div></td>
-      <td><strong style="font-size:13.5px; color: #f8fafc;">${u.nombre}</strong></td>
-      <td><a href="mailto:${u.email}" class="mi-color-correo" style="text-decoration:none;font-size:12.5px;">${u.username} (${u.email})</a></td>
+      <td><strong class="user-name">${u.nombre}</strong></td>
+      <td><a href="mailto:${u.email}" class="mi-color-correo user-email" style="text-decoration:none;font-size:12.5px;">${u.username} (${u.email})</a></td>
       <td>${Andina.getBadgeRol(u.rol)}</td>
       <td>${Andina.getBadgeEstado(u.estado)}</td>
       <td class="text-center">${verif}</td>
       <td style="font-size:12px;color:#94a3b8;">${Andina.formatDateTime(u.ultimo_acceso)}</td>
-      <td><div class="d-flex gap-1">
+      <td class="actions-cell"><div class="d-flex gap-1 flex-nowrap">
         <button class="btn btn-outline-primary btn-xs" onclick="abrirCambioRol(${u.id})" title="Cambiar rol"><i class="bi bi-person-gear"></i></button>
         <button class="btn ${u.estado==='Activo'?'btn-outline-warning':'btn-outline-success'} btn-xs" onclick="toggleEstado(${u.id})" title="${u.estado==='Activo'?'Desactivar':'Activar'}">
           <i class="bi ${u.estado==='Activo'?'bi-person-x':'bi-person-check'}"></i>
@@ -181,7 +250,19 @@ function renderUsuarios(data) {
   }).join('');
 
   if($.fn.DataTable.isDataTable('#tablaUsuarios')) $('#tablaUsuarios').DataTable().destroy();
-  $('#tablaUsuarios').DataTable({ language:{url:'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json'}, order:[[6,'desc']], pageLength:10 });
+  $('#tablaUsuarios').DataTable({
+    language:{url:'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json'},
+    order:[[6,'desc']],
+    pageLength:10,
+    autoWidth:false,
+    scrollX:true,
+    responsive:false,
+    columnDefs:[
+      { targets:[5,7], orderable:false, searchable:false },
+      { targets:[0,1,2], className:'text-break' },
+      { targets:[7], className:'actions-cell' }
+    ]
+  });
 }
 
 function filtrar() {

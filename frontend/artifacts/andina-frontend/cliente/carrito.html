@@ -335,18 +335,48 @@ async function confirmarPedido() {
   const total = sub * 1.13 * (1 - descuentoPct/100);
   
   if (window.Andina && typeof Andina.procesarPagoSimulado === 'function') {
-    Andina.procesarPagoSimulado(total, async (metodoElegido) => {
+    Andina.procesarPagoSimulado(total, async (metodoElegido, detallesPago = {}) => {
       Andina.showLoader();
-      
-      const res = await Andina.apiRequest('crear_pedido_cliente', { items, total, metodo_pago: metodoElegido });
+      const { comprobante_pago, ...datosPago } = detallesPago;
+      const res = await Andina.apiRequest('crear_pedido_cliente', { items, total, metodo_pago: metodoElegido, ...datosPago });
+      if (res?.exito !== false && comprobante_pago && res.id_pedido) {
+        const fd = new FormData();
+        fd.append('id_pedido', res.id_pedido);
+        fd.append('referencia_pago', datosPago.referencia_pago || '');
+        fd.append('comprobante', comprobante_pago);
+        const upload = await Andina.apiUpload('subir_comprobante_pago', fd);
+        if (upload?.exito === false) {
+          Andina.showToast(upload.error || 'El pedido se guardo, pero no se pudo subir el comprobante', 'warning', 6000);
+        }
+      }
       
       Andina.hideLoader();
       
       if (res && res.exito !== false) {
         Carrito.vaciar();
+        const codigo = res.codigo_pedido || res.codigo || 'Pedido registrado';
+        const estado = res.estado || 'Pendiente';
+        const totalPedido = Number(res.total || total);
         await Swal.fire({
           title:'¡Compra Exitosa!',
-          html:`<p style="color:#64748b;">Tu pedido ha sido registrado pagando con <strong>${metodoElegido}</strong>. Te contactaremos pronto para coordinar la entrega.</p>`,
+          html:`<div style="text-align:left;color:#cbd5e1;">
+            <div style="padding:14px;border:1px solid rgba(0,198,255,.25);border-radius:12px;background:rgba(15,23,42,.72);margin-bottom:12px;">
+              <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;">Codigo de pedido</div>
+              <div style="font-size:22px;font-weight:800;color:#38ef7d;margin-top:2px;">${codigo}</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+              <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,.06);">
+                <div style="font-size:11px;color:#94a3b8;">Metodo</div>
+                <strong>${metodoElegido}</strong>
+              </div>
+              <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,.06);">
+                <div style="font-size:11px;color:#94a3b8;">Estado</div>
+                <strong>${estado}</strong>
+              </div>
+            </div>
+            <div style="font-size:14px;">Total registrado: <strong style="color:#00c6ff;">${Andina.formatBs(totalPedido)}</strong></div>
+            <p style="margin:10px 0 0;color:#94a3b8;font-size:13px;">Te contactaremos pronto para coordinar la entrega.</p>
+          </div>`,
           icon:'success', confirmButtonText:'Ver mis pedidos',
           background:'#111827', color:'#e2e8f0', confirmButtonColor:'#00a859'
         });

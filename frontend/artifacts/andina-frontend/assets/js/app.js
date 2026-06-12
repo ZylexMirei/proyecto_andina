@@ -340,6 +340,27 @@ async function apiRequest(accion, data = {}, method = 'POST') {
   }
 }
 
+async function apiUpload(accion, formData, method = 'POST') {
+  showLoader();
+  try {
+    const session = getSession();
+    const token = session ? session.token || '' : '';
+    const userId = session ? session.id_usuario || '' : '';
+    const url = `${API_BASE}?accion=${accion}${userId ? '&id_usuario=' + userId : ''}`;
+    const res = await fetch(url, {
+      method,
+      headers: { 'X-Token': token },
+      body: formData
+    });
+    const json = await res.json();
+    hideLoader();
+    return json;
+  } catch (e) {
+    hideLoader();
+    return { exito: false, mensaje: 'Error de conexion con el servidor', _offline: true };
+  }
+}
+
 // ===================== TOAST =====================
 function showToast(mensaje, tipo = 'success', duracion = 3500) {
   const iconMap = { success: 'bi-check-circle-fill', error: 'bi-x-circle-fill', warning: 'bi-exclamation-triangle-fill', info: 'bi-info-circle-fill' };
@@ -603,21 +624,48 @@ function mostrarSimulacionPago(metodo, monto, callback) {
   const montoFormat = formatBs(monto);
   
   if (metodo === 'QR') {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=PagoAndina${monto}`;
+    const qrUrl = location.pathname.includes('/cliente/') ? '../assets/img/qr-pago-andina.png' : 'assets/img/qr-pago-andina.png';
     Swal.fire({
       title: 'Escanea el código QR',
       html: `
         <p>Abre tu aplicación bancaria y escanea para pagar <strong>${montoFormat}</strong></p>
-        <img src="${qrUrl}" alt="QR Code" style="width: 200px; height: 200px; border-radius: 10px; border: 1px solid var(--border); padding: 10px;">
-        <div class="mt-3 text-muted" style="font-size: 0.85rem;"><i class="bi bi-arrow-repeat spin d-inline-block"></i> Esperando confirmación del banco...</div>
+        <img src="${qrUrl}" alt="QR de pago Distribuidora Andina" style="width: 230px; height: 230px; object-fit: contain; border-radius: 10px; border: 1px solid var(--border); padding: 10px; background:#fff;" onerror="this.style.display='none';document.getElementById('qrMissingMsg').style.display='block';">
+        <div id="qrMissingMsg" style="display:none;margin-top:10px;padding:10px;border:1px solid rgba(239,68,68,.25);border-radius:10px;background:rgba(239,68,68,.08);color:#fecaca;">Falta cargar el QR real en assets/img/qr-pago-andina.png</div>
+        <label class="form-label mt-3" style="font-size:12px;color:#cbd5e1;">Referencia, codigo o nro. de comprobante</label>
+        <input id="qrReferenciaPago" class="form-control" placeholder="Ej: 000123, transaccion, comprobante..." autocomplete="off">
+        <label class="form-label mt-3" style="font-size:12px;color:#cbd5e1;">Foto o PDF del comprobante</label>
+        <input id="qrArchivoComprobante" type="file" class="form-control" accept="image/png,image/jpeg,image/webp,application/pdf">
+        <div class="mt-3 text-muted" style="font-size: 0.85rem;"><i class="bi bi-shield-check"></i> Sube tu comprobante para revision del pago.</div>
       `,
       showCancelButton: true,
       showConfirmButton: true,
-      confirmButtonText: '<i class="bi bi-check-circle"></i> Simular que ya pagué',
+      confirmButtonText: '<i class="bi bi-check-circle"></i> Registrar pago QR',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#28a745'
+      confirmButtonColor: '#28a745',
+      preConfirm: () => {
+        const ref = document.getElementById('qrReferenciaPago')?.value.trim();
+        if (!ref || ref.length < 4) {
+          Swal.showValidationMessage('Escribe una referencia valida del comprobante');
+          return false;
+        }
+        const file = document.getElementById('qrArchivoComprobante')?.files?.[0];
+        if (!file) {
+          Swal.showValidationMessage('Sube una foto o PDF del comprobante');
+          return false;
+        }
+        const tiposValidos = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'];
+        if (!tiposValidos.includes(file.type)) {
+          Swal.showValidationMessage('El comprobante debe ser imagen PNG/JPG/WEBP o PDF');
+          return false;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          Swal.showValidationMessage('El comprobante no debe superar 5 MB');
+          return false;
+        }
+        return { referencia_pago: ref, comprobante_pago: file };
+      }
     }).then((result) => {
-      if (result.isConfirmed) finalizaPago(metodo, callback);
+      if (result.isConfirmed) finalizaPago('QR Simple', callback, { ...result.value, verificacion_pago: 'Pendiente' });
     });
 
   } else if (metodo === 'Tarjeta') {
@@ -666,7 +714,7 @@ function mostrarSimulacionPago(metodo, monto, callback) {
   }
 }
 
-function finalizaPago(metodo, callback) {
+function finalizaPago(metodo, callback, detallesPago = {}) {
   // Lluvia de confeti
   const duration = 3000;
   const end = Date.now() + duration;
@@ -701,12 +749,12 @@ function finalizaPago(metodo, callback) {
 
   Swal.fire({
     icon: 'success',
-    title: '¡Pago Confirmado!',
-    text: `El pago mediante ${metodo} ha sido verificado con éxito.`,
+    title: metodo === 'QR Simple' ? 'Pago QR registrado' : 'Pago confirmado',
+    text: metodo === 'QR Simple' ? 'Guardamos tu referencia. El pedido queda pendiente hasta verificar el pago.' : `El pago mediante ${metodo} ha sido verificado con exito.`,
     timer: 2500,
     showConfirmButton: false
   }).then(() => {
-    callback(metodo);
+    callback(metodo, detallesPago);
   });
 }
 
@@ -828,7 +876,7 @@ const MOCK_DATA = {
 window.Andina = {
   getSession, setSession, clearSession, requireAuth, requireClienteAuth,
   hasPermission, initPage, buildSidebar, buildNavbar,
-  showToast, showLoader, hideLoader, apiRequest, logout,
+  showToast, showLoader, hideLoader, apiRequest, apiUpload, logout,
   formatBs, formatFecha, formatFechaCorta, formatDateTime, procesarPagoSimulado,
   getBadgeEstado, getBadgeRol, getRoot,
   applyRolePermissions, toggleTheme, initTheme, setupImagePreview,

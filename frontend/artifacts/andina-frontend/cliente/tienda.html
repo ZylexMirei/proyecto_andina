@@ -229,7 +229,7 @@
 
     <div class="filter-card">
       <div class="filter-title"><i class="bi bi-grid me-2"></i>Categorías</div>
-      <div class="d-flex flex-column gap-1">
+      <div class="d-flex flex-column gap-1" id="categoriasFiltro">
         <button class="categoria-btn active" data-cat="" onclick="seleccionarCat(this,'')">Todos los productos</button>
         <button class="categoria-btn" data-cat="Lácteos" onclick="seleccionarCat(this,'Lácteos')"><i class="bi bi-droplet me-2"></i>Lácteos</button>
         <button class="categoria-btn" data-cat="Bebidas" onclick="seleccionarCat(this,'Bebidas')"><i class="bi bi-cup-straw me-2"></i>Bebidas</button>
@@ -332,16 +332,41 @@ document.getElementById('saludo').textContent = `Hola, ${session.nombre.split(' 
 let PRODS = [];
 let catActual = '', vistaActual = 'grid';
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
 async function cargarProductos() {
   try {
     const data = await Andina.apiRequest('obtener_productos');
     PRODS = data.filter(p => p.estado !== 'Agotado');
+    ajustarFiltroPrecio();
+    renderCategorias();
     cargarRecs();
     filtrar();
   } catch (error) {
     console.error("Error al cargar productos:", error);
     Andina.showToast('Error al conectar con la base de datos', 'error');
   }
+}
+
+function ajustarFiltroPrecio() {
+  const slider = document.getElementById('filtroPrecio');
+  const maxPrecio = Math.max(20, ...PRODS.map(p => Number(p.precio || 0)));
+  slider.max = Math.ceil(maxPrecio);
+  slider.value = Math.ceil(maxPrecio);
+}
+
+function renderCategorias() {
+  const wrap = document.getElementById('categoriasFiltro');
+  const cats = [...new Set(PRODS.map(p => p.categoria || 'Sin categoria'))].sort((a,b) => a.localeCompare(b));
+  wrap.innerHTML = [
+    `<button class="categoria-btn active" data-cat=""><i class="bi bi-grid me-2"></i>Todos los productos</button>`,
+    ...cats.map(cat => `<button class="categoria-btn" data-cat="${escapeHtml(cat)}"><i class="bi bi-tag me-2"></i>${escapeHtml(cat)}</button>`)
+  ].join('');
+  wrap.querySelectorAll('.categoria-btn').forEach(btn => {
+    btn.addEventListener('click', () => seleccionarCat(btn, btn.dataset.cat || ''));
+  });
 }
 
 function seleccionarCat(btn, cat) {
@@ -358,15 +383,19 @@ function filtrar() {
   const ordenar = document.getElementById('ordenar').value;
   document.getElementById('precioLabel').textContent = `Bs. ${precioMax.toFixed(2)}`;
 
-  let filtrados = PRODS.filter(p =>
-    (p.nombre.toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q)) &&
-    (!catActual || p.categoria === catActual) &&
-    p.precio <= precioMax
-  );
+  let filtrados = PRODS.filter(p => {
+    const nombre = String(p.nombre || '').toLowerCase();
+    const codigo = String(p.codigo || '').toLowerCase();
+    const categoria = String(p.categoria || 'Sin categoria');
+    const precio = Number(p.precio || 0);
+    return (nombre.includes(q) || codigo.includes(q) || categoria.toLowerCase().includes(q)) &&
+      (!catActual || categoria === catActual) &&
+      precio <= precioMax;
+  });
 
-  if(ordenar==='precio_asc') filtrados.sort((a,b)=>a.precio-b.precio);
-  else if(ordenar==='precio_desc') filtrados.sort((a,b)=>b.precio-a.precio);
-  else if(ordenar==='nombre') filtrados.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  if(ordenar==='precio_asc') filtrados.sort((a,b)=>Number(a.precio || 0)-Number(b.precio || 0));
+  else if(ordenar==='precio_desc') filtrados.sort((a,b)=>Number(b.precio || 0)-Number(a.precio || 0));
+  else if(ordenar==='nombre') filtrados.sort((a,b)=>String(a.nombre || '').localeCompare(String(b.nombre || '')));
 
   renderProductos(filtrados);
 }
@@ -462,7 +491,7 @@ function verProducto(id) {
 
 function limpiarFiltros() {
   document.getElementById('buscarProducto').value='';
-  document.getElementById('filtroPrecio').value=20;
+  document.getElementById('filtroPrecio').value=document.getElementById('filtroPrecio').max;
   document.getElementById('ordenar').value='';
   catActual='';
   document.querySelectorAll('.categoria-btn').forEach((b,i)=>b.classList.toggle('active',i===0));

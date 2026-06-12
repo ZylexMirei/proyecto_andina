@@ -74,6 +74,7 @@
     .pedido-table tbody tr:last-child td { border-bottom:none; }
     .pedido-table tfoot td { padding-top:12px; font-size:14px; color:#64748b; border-top:1px solid rgba(255,255,255,0.07); }
     .pedido-total { font-family:'Space Grotesk',sans-serif; font-weight:800; font-size:18px; color:#38ef7d; }
+    .payment-pill { display:inline-flex; align-items:center; gap:5px; margin-top:6px; padding:5px 9px; border-radius:999px; border:1px solid rgba(0,198,255,.18); background:rgba(0,198,255,.08); color:#00c6ff; font-size:11.5px; font-weight:700; }
 
     /* DELIVERY INFO */
     .delivery-info { font-size:12.5px; color:#475569; display:flex; align-items:center; gap:6px; }
@@ -155,7 +156,10 @@ let pedidosCliente = [];
 async function cargarPedidos() {
   try {
     const data = await Andina.apiRequest('obtener_pedidos_cliente');
-    pedidosCliente = data || [];
+    pedidosCliente = (data || []).sort((a,b) => {
+      const fechaCmp = String(b.fecha || '').localeCompare(String(a.fecha || ''));
+      return fechaCmp || (Number(b.id || 0) - Number(a.id || 0));
+    });
     renderPedidos(pedidosCliente);
   } catch (error) {
     console.error("Error al cargar pedidos:", error);
@@ -189,6 +193,7 @@ function renderPedidos(filtrado) {
         <div>
           <div class="pedido-code">${p.codigo}</div>
           <div class="pedido-date"><i class="bi bi-calendar3 me-1"></i>${Andina.formatFecha(p.fecha)}</div>
+          <div class="payment-pill"><i class="bi bi-credit-card-2-front"></i>${p.metodo_pago || 'No registrado'}</div>
         </div>
         ${getEstadoBadge(p.estado)}
       </div>
@@ -243,7 +248,18 @@ function cancelar(id) {
     confirmButtonText:'Sí, cancelar', cancelButtonText:'No',
     confirmButtonColor:'#ef4444', cancelButtonColor:'#1e293b',
     background:'#111827', color:'#e2e8f0'
-  }).then(r=>{ if(r.isConfirmed) Andina.showToast('Pedido cancelado','success'); });
+  }).then(async r=>{
+    if(!r.isConfirmed) return;
+    const res = await Andina.apiRequest('cancelar_pedido_cliente', { id_pedido: id });
+    if(res && res.exito !== false) {
+      const pedido = pedidosCliente.find(x => x.id === id);
+      if(pedido) pedido.estado = 'Cancelado';
+      renderPedidos(pedidosCliente);
+      Andina.showToast('Pedido cancelado','success');
+    } else {
+      Andina.showToast(res?.error || 'No se pudo cancelar el pedido','error');
+    }
+  });
 }
 
 function verFactura(id) {
@@ -255,7 +271,9 @@ function verFactura(id) {
       <strong style="color:#e2e8f0;">Distribuidora Andina SRL</strong><br>
       NIT: 1234567890<br>Santa Cruz de la Sierra, Bolivia<br><br>
       <strong style="color:#e2e8f0;">Cliente:</strong> ${session.nombre}<br>
-      <strong style="color:#e2e8f0;">Fecha:</strong> ${Andina.formatFecha(p.fecha)}<br><br>
+      <strong style="color:#e2e8f0;">Fecha:</strong> ${Andina.formatFecha(p.fecha)}<br>
+      <strong style="color:#e2e8f0;">Metodo de pago:</strong> ${p.metodo_pago || 'No registrado'}<br>
+      <strong style="color:#e2e8f0;">Estado:</strong> ${p.estado || 'Pendiente'}<br><br>
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
           <th style="padding:6px 0;color:#64748b;font-size:11px;text-transform:uppercase;">Producto</th>
@@ -325,7 +343,8 @@ function imprimirFactura(id) {
         </div>
         <div class="text-right">
           <strong>Fecha:</strong> ${Andina.formatFecha(p.fecha)}<br>
-          <strong>Estado:</strong> PAGADO
+          <strong>Metodo:</strong> ${p.metodo_pago || 'No registrado'}<br>
+          <strong>Estado:</strong> ${p.estado || 'Pendiente'}
         </div>
       </div>
       <table>
